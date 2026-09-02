@@ -1,425 +1,161 @@
 # OfferProof Deterministic Risk-Signal Registry
 
-> **Document Type**: Research Specification  
-> **Status**: Draft  
-> **Version**: 0.1.0  
-> **Last Updated**: 2024-09-02  
-> **Issue**: #5  
-
----
-
-## Overview
-
-This document defines a **deterministic observable-signal registry** for the OfferProof system. Each signal is designed to identify patterns that *may* correlate with anomalous or high-risk job postings, **without declaring fraud**. The registry is structured to ensure that:
-
-- Identical inputs always produce identical outputs
-- Signals are based on observable, verifiable conditions
-- Each signal includes neutral, user-facing explanations
-- Limitations and legitimate counterexamples are explicitly documented
-- All official sources are cited with verification status
-
-**Important**: This registry does **not** assign confidence scores, maintain company blacklists, or enable personal tracking. It is a neutral, deterministic catalog of observable patterns.
-
----
-
-## Signal Registry Schema
-
-Each signal entry follows this structure:
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `signal_id` | string | Yes | Stable, unique identifier (format: `SIG-XXXX`) |
-| `signal_name` | string | Yes | Human-readable name |
-| `category` | string | Yes | Grouping category (e.g., `compensation`, `metadata`, `contact`) |
-| `observable_condition` | string | Yes | Precise, deterministic condition that triggers the signal |
-| `original_evidence_fields` | string[] | Yes | JSON paths or field names from the input that are evaluated |
-| `user_facing_explanation` | string | Yes | Neutral, non-accusatory description shown to users |
-| `limitations` | string[] | Yes | Contexts where the signal may be inaccurate or incomplete |
-| `supported_jurisdictions` | string[] | Yes | ISO 3166-1 alpha-2 country codes where the signal is applicable |
-| `counterexamples` | string[] | Yes | Legitimate scenarios that trigger the signal |
-
----
-
-## Official Source Registry Schema
-
-Each official source referenced in this document follows this structure:
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `agency` | string | Yes | Name of the issuing agency or organization |
-| `jurisdiction` | string | Yes | ISO 3166-1 alpha-2 country code |
-| `title` | string | Yes | Official title of the document or resource |
-| `url` | string | Yes | Direct URL to the official source |
-| `verification_action` | string | Yes | Action taken to verify (e.g., "Downloaded and reviewed", "Checked via API") |
-| `last_checked` | string | Yes | Date in YYYY-MM-DD format when the source was last verified |
-| `verified` | boolean | Yes | Whether the link was confirmed against a current official source |
-
----
-
-## Signal Registry
-
-### Category: Compensation Anomalies
-
-#### SIG-0001: Unusually High Hourly Rate
-
-- **Signal ID**: `SIG-0001`
-- **Signal Name**: Unusually High Hourly Rate
-- **Category**: `compensation`
-- **Observable Condition**: Hourly rate exceeds the 99th percentile for the job title and location, based on publicly available labor statistics.
-- **Original Evidence Fields**: `compensation.hourly_rate`, `job_title`, `location.country`, `location.region`
-- **User-Facing Explanation**: "The hourly rate for this position is significantly higher than typical rates for similar roles in this area."
-- **Limitations**:
-  - Labor statistics may be outdated or incomplete for niche roles
-  - High rates may be justified for specialized or urgent positions
-  - Regional variations are not always captured in national data
-- **Supported Jurisdictions**: `US`, `CA`, `GB`, `DE`, `FR`, `JP`
-- **Counterexamples**:
-  - Senior executive roles with high hourly rates
-  - Specialized technical roles in high-demand, low-supply markets
-  - Contract roles requiring unique or rare expertise
-
-#### SIG-0002: Missing Compensation Information
-
-- **Signal ID**: `SIG-0002`
-- **Signal Name**: Missing Compensation Information
-- **Category**: `compensation`
-- **Observable Condition**: No compensation information (hourly rate, salary range, or payment terms) is provided in the job posting.
-- **Original Evidence Fields**: `compensation`
-- **User-Facing Explanation**: "This posting does not include compensation details."
-- **Limitations**:
-  - Some jurisdictions do not require compensation disclosure
-  - Employers may prefer to discuss compensation during interviews
-  - Salary may be negotiable or dependent on experience
-- **Supported Jurisdictions**: `US`, `CA`, `GB`, `DE`, `FR`, `JP`, `AU`, `NZ`
-- **Counterexamples**:
-  - Postings in regions where salary disclosure is not customary
-  - Roles where compensation is highly variable based on candidate qualifications
-
-#### SIG-0003: Vague Compensation Range
-
-- **Signal ID**: `SIG-0003`
-- **Signal Name**: Vague Compensation Range
-- **Category**: `compensation`
-- **Observable Condition**: Compensation range spans more than 100% of the lower bound (e.g., "$20,000 - $50,000" has a span of 150%).
-- **Original Evidence Fields**: `compensation.min`, `compensation.max`
-- **User-Facing Explanation**: "The compensation range for this position is unusually wide."
-- **Limitations**:
-  - Wide ranges may be appropriate for roles with variable responsibilities
-  - Some employers intentionally use broad ranges to attract diverse candidates
-- **Supported Jurisdictions**: `US`, `CA`, `GB`, `DE`, `FR`, `JP`
-- **Counterexamples**:
-  - Entry-level to senior roles combined in one posting
-  - Postings that combine multiple positions with different pay grades
-
-#### SIG-0004: Non-Standard Payment Terms
-
-- **Signal ID**: `SIG-0004`
-- **Signal Name**: Non-Standard Payment Terms
-- **Category**: `compensation`
-- **Observable Condition**: Payment terms include non-standard currencies (e.g., cryptocurrency), barter, or equity-only compensation for non-executive roles.
-- **Original Evidence Fields**: `compensation.currency`, `compensation.type`
-- **User-Facing Explanation**: "The payment terms for this position use non-standard methods."
-- **Limitations**:
-  - Cryptocurrency payments may be legitimate in some industries
-  - Equity compensation is common in startups
-  - Barter arrangements may be valid in certain contexts
-- **Supported Jurisdictions**: `US`, `CA`, `GB`, `DE`, `FR`, `JP`
-- **Counterexamples**:
-  - Startup roles offering equity as part of compensation
-  - International remote roles paid in a currency other than the local currency
-
----
-
-### Category: Metadata Anomalies
-
-#### SIG-0101: Missing Company Information
-
-- **Signal ID**: `SIG-0101`
-- **Signal Name**: Missing Company Information
-- **Category**: `metadata`
-- **Observable Condition**: No company name, website, or physical address is provided in the job posting.
-- **Original Evidence Fields**: `company.name`, `company.website`, `company.address`
-- **User-Facing Explanation**: "This posting does not include company details."
-- **Limitations**:
-  - Some postings may be made by recruitment agencies on behalf of clients
-  - Startups or small businesses may not have a website
-  - Remote-first companies may not have a physical address
-- **Supported Jurisdictions**: All
-- **Counterexamples**:
-  - Postings by recruitment agencies representing confidential clients
-  - Individual contractors or freelancers hiring subcontractors
-
-#### SIG-0102: Newly Created Company Domain
-
-- **Signal ID**: `SIG-0102`
-- **Signal Name**: Newly Created Company Domain
-- **Category**: `metadata`
-- **Observable Condition**: The company website domain was registered less than 30 days ago, based on WHOIS data.
-- **Original Evidence Fields**: `company.website`
-- **User-Facing Explanation**: "The company's website domain was registered recently."
-- **Limitations**:
-  - New companies may legitimately have recently registered domains
-  - WHOIS data may be incomplete or inaccurate
-  - Domain privacy protections may obscure registration dates
-- **Supported Jurisdictions**: All
-- **Counterexamples**:
-  - Recently founded startups
-  - Companies that rebranded and registered a new domain
-
-#### SIG-0103: Generic Company Email Domain
-
-- **Signal ID**: `SIG-0103`
-- **Signal Name**: Generic Company Email Domain
-- **Category**: `metadata`
-- **Observable Condition**: The contact email uses a generic domain (e.g., Gmail, Yahoo, Hotmail) instead of a company-specific domain.
-- **Original Evidence Fields**: `contact.email`
-- **User-Facing Explanation**: "The contact email uses a generic email provider rather than a company domain."
-- **Limitations**:
-  - Small businesses or startups may use generic email domains
-  - Some legitimate companies use generic emails for initial contact
-  - Recruitment agencies may use generic emails
-- **Supported Jurisdictions**: All
-- **Counterexamples**:
-  - Small businesses without a custom email domain
-  - Independent recruiters or freelancers
-
-#### SIG-0104: Inconsistent Location Information
-
-- **Signal ID**: `SIG-0104`
-- **Signal Name**: Inconsistent Location Information
-- **Category**: `metadata`
-- **Observable Condition**: The job location (city, region, or country) does not match the company's registered address or website domain.
-- **Original Evidence Fields**: `job.location`, `company.address`, `company.website`
-- **User-Facing Explanation**: "The job location and company address do not appear to match."
-- **Limitations**:
-  - Companies may have multiple offices or remote workers
-  - Job postings may target candidates in different regions
-  - Company websites may not list all locations
-- **Supported Jurisdictions**: All
-- **Counterexamples**:
-  - Remote-first companies hiring in multiple regions
-  - Companies with distributed teams
-
----
-
-### Category: Contact Anomalies
-
-#### SIG-0201: Missing Contact Information
-
-- **Signal ID**: `SIG-0201`
-- **Signal Name**: Missing Contact Information
-- **Category**: `contact`
-- **Observable Condition**: No contact email, phone number, or application URL is provided in the job posting.
-- **Original Evidence Fields**: `contact.email`, `contact.phone`, `application_url`
-- **User-Facing Explanation**: "This posting does not include contact information for applications."
-- **Limitations**:
-  - Some postings may direct applicants to a company website
-  - Application processes may be handled through a third-party platform
-- **Supported Jurisdictions**: All
-- **Counterexamples**:
-  - Postings that use an application form on the company website
-  - Postings on job boards with built-in application systems
-
-#### SIG-0202: International Phone Number for Local Job
-
-- **Signal ID**: `SIG-0202`
-- **Signal Name**: International Phone Number for Local Job
-- **Category**: `contact`
-- **Observable Condition**: The contact phone number has a country code that does not match the job location's country.
-- **Original Evidence Fields**: `contact.phone`, `job.location.country`
-- **User-Facing Explanation**: "The contact phone number is from a different country than the job location."
-- **Limitations**:
-  - Companies may have international hiring teams
-  - Remote jobs may have global contact points
-  - Phone number parsing may be inaccurate
-- **Supported Jurisdictions**: All
-- **Counterexamples**:
-  - Multinational companies with centralized hiring
-  - Remote jobs with global teams
-
-#### SIG-0203: Disposable Email Domain
-
-- **Signal ID**: `SIG-0203`
-- **Signal Name**: Disposable Email Domain
-- **Category**: `contact`
-- **Observable Condition**: The contact email uses a known disposable or temporary email domain.
-- **Original Evidence Fields**: `contact.email`
-- **User-Facing Explanation**: "The contact email uses a temporary email service."
-- **Limitations**:
-  - Disposable email domains may be used for legitimate privacy reasons
-  - New disposable email services are frequently created
-- **Supported Jurisdictions**: All
-- **Counterexamples**:
-  - None (disposable emails are generally not used for legitimate business contact)
-
----
-
-### Category: Job Description Anomalies
-
-#### SIG-0301: Excessive Capitalization or Exclamation Marks
-
-- **Signal ID**: `SIG-0301`
-- **Signal Name**: Excessive Capitalization or Exclamation Marks
-- **Category**: `job_description`
-- **Observable Condition**: More than 20% of the job description text is in ALL CAPS, or more than 5 exclamation marks per 100 words.
-- **Original Evidence Fields**: `job.description`
-- **User-Facing Explanation**: "The job description uses an unusually high amount of capitalization or exclamation marks."
-- **Limitations**:
-  - Some industries or roles may use more emphatic language
-  - Writing style varies by region and culture
-- **Supported Jurisdictions**: All
-- **Counterexamples**:
-  - Marketing or sales roles where enthusiasm is emphasized
-  - Postings targeting regions with different writing norms
-
-#### SIG-0302: Poor Grammar or Spelling
-
-- **Signal ID**: `SIG-0302`
-- **Signal Name**: Poor Grammar or Spelling
-- **Category**: `job_description`
-- **Observable Condition**: The job description contains more than 3 grammar or spelling errors per 100 words, based on a standard language model.
-- **Original Evidence Fields**: `job.description`
-- **User-Facing Explanation**: "The job description contains multiple grammar or spelling errors."
-- **Limitations**:
-  - Language models may produce false positives
-  - Non-native speakers may make errors in legitimate postings
-  - Some errors may be intentional or stylistic
-- **Supported Jurisdictions**: `US`, `CA`, `GB`, `AU`, `NZ` (English-language jurisdictions)
-- **Counterexamples**:
-  - Postings from non-native speakers
-  - Postings with intentional informal or creative language
-
-#### SIG-0303: Vague Job Title
-
-- **Signal ID**: `SIG-0303`
-- **Signal Name**: Vague Job Title
-- **Category**: `job_description`
-- **Observable Condition**: The job title consists of generic terms (e.g., "Assistant", "Manager", "Associate") without a specific role or industry.
-- **Original Evidence Fields**: `job.title`
-- **User-Facing Explanation**: "The job title is unusually generic and does not specify the role or industry."
-- **Limitations**:
-  - Some industries use generic titles intentionally
-  - Entry-level roles may have less specific titles
-- **Supported Jurisdictions**: All
-- **Counterexamples**:
-  - Generalist roles (e.g., "Administrative Assistant")
-  - Roles in industries with standardized generic titles
-
-#### SIG-0304: Unrealistic Job Requirements
-
-- **Signal ID**: `SIG-0304`
-- **Signal Name**: Unrealistic Job Requirements
-- **Category**: `job_description`
-- **Observable Condition**: The job requires more than 10 years of experience in a technology or skill that has existed for less than 10 years.
-- **Original Evidence Fields**: `job.requirements`, `job.skills`
-- **User-Facing Explanation**: "The job requirements include experience with a technology or skill that has not existed for the stated duration."
-- **Limitations**:
-  - Technology adoption timelines may vary by region or industry
-  - Some skills may have predecessors with similar names
-- **Supported Jurisdictions**: All
-- **Counterexamples**:
-  - Postings that conflate related technologies (e.g., "10 years of React" when React was released 9 years ago)
-
----
-
-### Category: Application Process Anomalies
-
-#### SIG-0401: Request for Sensitive Personal Information
-
-- **Signal ID**: `SIG-0401`
-- **Signal Name**: Request for Sensitive Personal Information
-- **Category**: `application_process`
-- **Observable Condition**: The application process requests sensitive personal information (e.g., social security number, passport details, bank account information) before an interview or offer.
-- **Original Evidence Fields**: `application.questions`, `application.required_documents`
-- **User-Facing Explanation**: "The application requests sensitive personal information early in the hiring process."
-- **Limitations**:
-  - Some jurisdictions or industries may require early disclosure of certain information
-  - Background checks may require sensitive information
-- **Supported Jurisdictions**: `US`, `CA`, `GB`, `DE`, `FR`, `JP`
-- **Counterexamples**:
-  - Government or security-clearance roles requiring background checks
-  - Financial industry roles with strict compliance requirements
-
-#### SIG-0402: Request for Payment or Fees
-
-- **Signal ID**: `SIG-0402`
-- **Signal Name**: Request for Payment or Fees
-- **Category**: `application_process`
-- **Observable Condition**: The application process requests payment, fees, or purchases (e.g., equipment, training, background checks) from the candidate.
-- **Original Evidence Fields**: `application.fees`, `application.required_purchases`
-- **User-Facing Explanation**: "The application process requests payment or fees from the candidate."
-- **Limitations**:
-  - Some legitimate roles may require candidates to purchase equipment
-  - Background checks or certifications may require fees
-- **Supported Jurisdictions**: All
-- **Counterexamples**:
-  - Roles requiring specialized equipment not provided by the employer
-  - Positions requiring candidates to obtain specific certifications
-
-#### SIG-0403: Unusual Application Method
-
-- **Signal ID**: `SIG-0403`
-- **Signal Name**: Unusual Application Method
-- **Category**: `application_process`
-- **Observable Condition**: The application method involves unconventional channels (e.g., messaging apps, social media direct messages, or non-company email).
-- **Original Evidence Fields**: `application.method`, `application.url`
-- **User-Facing Explanation**: "The application method uses an unconventional channel."
-- **Limitations**:
-  - Some industries or regions may use non-traditional application methods
-  - Small businesses may prefer direct communication
-- **Supported Jurisdictions**: All
-- **Counterexamples**:
-  - Startups or small businesses using direct communication
-  - Roles in creative or tech industries with informal hiring processes
-
----
-
-## Official Source Registry
-
-The following official sources are referenced in the development of this registry. **Only links marked as `verified: true` have been confirmed against current official sources.**
-
-| Agency | Jurisdiction | Title | URL | Verification Action | Last Checked | Verified |
-|--------|--------------|-------|-----|---------------------|--------------|----------|
-| U.S. Bureau of Labor Statistics | US | Occupational Employment and Wage Statistics | https://www.bls.gov/oew/ | Downloaded and reviewed | 2024-09-01 | true |
-| Statistics Canada | CA | Labour Force Survey | https://www.statcan.gc.ca/en/lfs | Downloaded and reviewed | 2024-09-01 | true |
-| UK Office for National Statistics | GB | Annual Survey of Hours and Earnings | https://www.ons.gov.uk/employmentandlabourmarket/peopleinwork/earningsandworkinghours | Downloaded and reviewed | 2024-09-01 | true |
-| Eurostat | EU | Earnings Statistics | https://ec.europa.eu/eurostat/web/labour-market/earnings | Downloaded and reviewed | 2024-09-01 | true |
-| ICANN | Global | WHOIS Lookup | https://lookup.icann.org/ | Tested with sample domains | 2024-09-01 | true |
-| Disposable Email Domain List | Global | Disposable Email Domains | https://github.com/disposable-email-domains/disposable-email-domains | Reviewed repository | 2024-09-01 | false |
-
----
-
-## Deterministic Behavior Guarantee
-
-Each signal in this registry is designed to be **deterministic**: given identical input data, the signal will always produce the same output. This is achieved by:
-
-1. **Precise Conditions**: Observable conditions are defined using exact thresholds or patterns (e.g., "exceeds 99th percentile", "registered less than 30 days ago").
-2. **Field-Based Evaluation**: Signals evaluate specific fields in the input data, ensuring consistency.
-3. **No Randomness**: Signals do not incorporate randomness, time-based variation, or external state that could affect the result.
-4. **Static Data**: Where external data is referenced (e.g., labor statistics), it is either:
-   - Embedded in the signal logic (e.g., lists of disposable email domains)
-   - Versioned and static for the lifetime of the signal
-
----
-
-## Usage Notes
-
-1. **Neutrality**: All user-facing explanations are neutral and non-accusatory. They describe observable facts without implying intent or fraud.
-2. **Counterexamples**: Every signal includes legitimate scenarios that may trigger it, reinforcing that signals are not definitive indicators of fraud.
-3. **Jurisdiction Awareness**: Signals explicitly state the jurisdictions where they are applicable, as norms and regulations vary globally.
-4. **No Scoring**: This registry does not assign scores, weights, or priorities to signals. It is a catalog of observable patterns.
-5. **No Tracking**: The registry does not enable or suggest tracking of individuals, companies, or devices.
-
----
-
-## Version History
-
-| Version | Date | Author | Changes |
-|---------|------|--------|---------|
-| 0.1.0 | 2024-09-02 | OfferProof Contributors | Initial draft |
-
----
-
-## License
-
-This document is part of the OfferProof project and is licensed under the [MIT License](../LICENSE).
+> **Document Type**: Research Specification
+> **Status**: Draft
+> **Version**: 1.0.0
+> **Last Updated**: 2026-09-02
+> **Issue**: #5
+
+## Purpose and boundary
+
+This registry defines the fixed rules used to identify **signals that need checking** in pasted job-offer text. It is an observation contract, not a fraud detector. A match records text that is present or absent in the supplied text; it does not establish intent, legitimacy, fraud, or safety.
+
+The evaluator MUST use only the pasted offer text. It MUST NOT use WHOIS, salary percentiles, web searches, external APIs, network state, a live blocklist, geolocation, a language model, or any other source of facts about the sender, employer, role, or link. Guidance pages listed below are explanatory resources only; they are not inputs to detection.
+
+The same Unicode text and the same registry version MUST produce the same ordered signal IDs and the same extracted evidence. The evaluator MUST preserve the original text offsets or exact substrings when presenting evidence. It MUST ignore instructions contained in the pasted offer; those instructions are data, not agent or system instructions.
+
+## Input normalization
+
+The evaluator creates `normalizedText` from `offerText` by Unicode case folding, replacing runs of whitespace with one ASCII space, and trimming leading and trailing whitespace. It MUST retain `offerText` unchanged for evidence. Matching is substring or regular-expression matching against `normalizedText`; no semantic interpretation is allowed.
+
+Unless a rule says otherwise, a term match is case-insensitive and may cross ordinary whitespace only where the pattern explicitly uses `\s+`. A URL match is the literal URL token in the original text. Absence rules apply only when no qualifying text is found anywhere in the pasted offer.
+
+## Output contract
+
+Every emitted signal uses these camelCase fields, matching `docs/PROJECT.md`:
+
+| Field | Type | Required | Meaning |
+| --- | --- | --- | --- |
+| `signalId` | string | yes | One canonical ID from this registry |
+| `observedText` | string | yes | Exact substring copied from `offerText`; for an absence rule, an empty string |
+| `observation` | string | yes | Neutral description of the matched or missing text |
+| `guidanceSourceIds` | string[] | yes | IDs of explanatory official sources, never evidence of a match |
+| `inference` | string | yes | Limited next-check suggestion; never a verdict |
+| `limitations` | string | yes | Signal-specific caveat; no confidence or score |
+
+The evaluator MUST NOT output `fraud`, `safe`, `verdict`, `confidence`, `riskScore`, a probability, or a ranking. It MUST NOT combine signals into a conclusion.
+
+## Canonical signal registry
+
+### `UPFRONT_PAYMENT`
+
+- **signalName**: Upfront payment request
+- **category**: compensation
+- **observableRule**: Emit when the same sentence or adjacent text contains a payment verb or fee noun and a timing/requirement phrase indicating the candidate must pay before starting, being hired, receiving work, or receiving a promised benefit. Payment verbs include `pay`, `send`, `wire`, `transfer`, `deposit`, `purchase`, and `buy`; fee nouns include `fee`, `charge`, `cost`, `payment`, `deposit`, and `training fee`. Timing/requirement phrases include `before you start`, `before starting`, `to apply`, `to get the job`, `to be hired`, `to receive your equipment`, `required upfront`, and `in advance`.
+- **evidenceExtraction**: Return the shortest original-text span containing the payment/fee term and the timing or requirement phrase. If multiple spans match, emit one signal with the earliest span.
+- **observation**: The offer text asks the candidate to provide money before a stated hiring or work step.
+- **inference**: Do not send money until the payment request is independently checked through a channel the candidate already knows.
+- **limitations**: The rule cannot determine who pays, whether a reimbursement is promised, whether a fee is lawful, or whether the request is genuine. It can miss synonymous wording not listed in the fixed patterns.
+- **counterexamples**: A legitimate employer may describe a refundable deposit, a legally required license paid by the worker, or optional training; the text still warrants clarifying who pays and when.
+- **guidanceSourceIds**: [`FTC-JOB-SCAMS-2026`]
+
+### `PAYMENT_IN_CRYPTO_OR_GIFT_CARD`
+
+- **signalName**: Payment requested in cryptocurrency or gift cards
+- **category**: compensation
+- **observableRule**: Emit when the offer text contains a cryptocurrency term (`bitcoin`, `btc`, `ethereum`, `eth`, `crypto`, `cryptocurrency`, `usdt`, `wallet address`) or a gift-card term (`gift card`, `giftcard`, `itunes card`, `google play card`, `steam card`, `prepaid card`) within the same sentence or adjacent text as a payment/request verb (`pay`, `send`, `buy`, `purchase`, `transfer`, `load`, `provide`, `submit`, `deposit`) or an instruction to disclose a code, PIN, wallet address, or redemption number.
+- **evidenceExtraction**: Return the shortest original-text span containing the payment/request verb and the crypto or gift-card term; include the code/PIN instruction when that is the matching request.
+- **observation**: The offer text specifies cryptocurrency or a gift card as the requested payment or payment instrument.
+- **inference**: Pause and verify the payment method and recipient through an independent official channel before sending money or codes.
+- **limitations**: The rule does not identify the asset, value, jurisdiction, ownership, or whether the term is mentioned only as a job duty or warning. It does not inspect wallets, transactions, or external pages.
+- **counterexamples**: A blockchain company may pay wages in a documented cryptocurrency arrangement; a retail job may mention gift cards as merchandise. A match records the wording only.
+- **guidanceSourceIds**: [`FTC-JOB-SCAMS-2026`]
+
+### `URGENCY_PRESSURE`
+
+- **signalName**: Urgency or pressure language
+- **category**: communication
+- **observableRule**: Emit when the text contains at least one urgency term (`immediately`, `right now`, `within 24 hours`, `today only`, `last chance`, `act now`, `urgent`, `as soon as possible`, `before it expires`) and at least one consequence, scarcity, or obligation term (`you will lose`, `offer expires`, `limited slots`, `do not miss`, `must respond`, `final notice`, `otherwise`, `no time to think`).
+- **evidenceExtraction**: Return the shortest original-text span containing one urgency term and one consequence/scarcity/obligation term. If they occur in separate sentences, return both sentences joined by ` … `.
+- **observation**: The offer text combines a short deadline or immediate-action request with a consequence, scarcity claim, or obligation.
+- **inference**: Take time to review the offer and verify the sender without using contact details supplied only in the message.
+- **limitations**: A genuine employer may have a real closing date or interview slot. The fixed vocabulary is intentionally conservative and cannot assess tone outside the listed terms.
+- **counterexamples**: A time-limited seasonal role, a scheduled interview window, or a genuine hiring deadline may use urgency language.
+- **guidanceSourceIds**: [`FTC-JOB-SCAMS-2026`]
+
+### `OFF_PLATFORM_CONTACT`
+
+- **signalName**: Off-platform contact request
+- **category**: contact
+- **observableRule**: Emit when the text asks the candidate to continue hiring or application communication in a messaging or social platform (`WhatsApp`, `Telegram`, `Signal`, `Skype`, `Discord`, `Facebook Messenger`, `Instagram DM`, `DM`, `direct message`) or by a personal email provider (`gmail.com`, `yahoo.com`, `outlook.com`, `hotmail.com`, `proton.me`) using a directive such as `contact me`, `message me`, `reply to`, `move to`, `continue on`, `add me`, or `chat on`.
+- **evidenceExtraction**: Return the shortest original-text span containing the directive and the named channel, handle, username, phone number, or address.
+- **observation**: The offer text directs the candidate to continue contact through a named external or personal channel.
+- **inference**: Confirm the role and contact identity through an independently located employer channel before continuing.
+- **limitations**: Some small employers, recruiters, and legitimate roles use messaging apps. The rule does not determine whether a channel is authorized or whether an address belongs to an employer.
+- **counterexamples**: A recruiter may legitimately schedule an interview by WhatsApp; a freelance role may conventionally use Telegram. The channel alone is not a conclusion.
+- **guidanceSourceIds**: [`FTC-JOB-SCAMS-2026`]
+
+### `SENSITIVE_DATA_REQUEST`
+
+- **signalName**: Sensitive data request
+- **category**: personalData
+- **observableRule**: Emit when the offer text requests a government identifier (`social security`, `national insurance`, `resident registration`, `passport number`, `driver's license`, `tax id`), financial credential (`bank account`, `routing number`, `credit card`, `debit card`, `online banking`, `password`, `one-time code`, `verification code`), or a scan/photo of such data, together with a request verb (`send`, `provide`, `share`, `upload`, `confirm`, `verify`, `enter`, `submit`, `reply with`).
+- **evidenceExtraction**: Return the shortest original-text span containing the request verb and the sensitive-data term. Do not copy an actual identifier, password, or code into any output.
+- **observation**: The offer text asks the candidate to provide a named sensitive identifier, financial credential, or authentication secret.
+- **inference**: Do not provide the requested secret in the message; ask the purported employer how and when identity or payroll information is collected through an independently verified process.
+- **limitations**: Legitimate employers may collect some payroll or identity information after an offer through a secure, verified process. The rule does not judge timing, security, legality, or the recipient.
+- **counterexamples**: A verified payroll provider may request bank details after hiring; a regulated role may require identity documents. The pasted request remains an item to verify.
+- **guidanceSourceIds**: [`FTC-JOB-SCAMS-2026`]
+
+### `UNVERIFIED_OR_SHORTENED_LINK`
+
+- **signalName**: Link requiring independent verification or shortened link
+- **category**: link
+- **observableRule**: Emit when the text contains a URL whose host is a known shortening host (`bit.ly`, `tinyurl.com`, `t.co`, `goo.gl`, `ow.ly`, `buff.ly`, `is.gd`, `cutt.ly`, `rb.gy`) or a URL token whose host is not repeated in the same offer immediately after the literal label `official domain:`. A URL is never treated as verified from its appearance alone. The only text-only exception is that exact repeated host declaration; it is still not external verification.
+- **evidenceExtraction**: Return the exact URL token, including its scheme and path, as written in `offerText`. For a non-shortened URL, also return the adjacent employer-domain label if one is explicitly present.
+- **observation**: The offer text contains a shortened link or a link whose ownership cannot be established from the pasted text alone.
+- **inference**: Do not click the pasted link; independently locate the purported employer's official site and navigate to the opportunity from there.
+- **limitations**: The rule cannot resolve redirects, certificate status, domain ownership, URL reputation, or whether a link is current. A domain that looks official is still unverified under this text-only contract.
+- **counterexamples**: A legitimate employer may use a recruiting platform or shortened campaign link. The signal requests independent checking; it does not label the destination.
+- **guidanceSourceIds**: [`FTC-JOB-SCAMS-2026`]
+
+### `MISSING_EMPLOYER_DETAILS`
+
+- **signalName**: Missing employer details
+- **category**: employerMetadata
+- **observableRule**: Emit only when the entire pasted offer contains none of the following employer-detail patterns: an organization marker plus a name (`company`, `employer`, `inc.`, `ltd`, `llc`, `corp`, `株式会社`, `주식회사`), a labeled employer/company field, or a sentence naming an organization as the hiring party (`we are`, `our company`, `hiring for`, `employer:`). A personal name alone does not satisfy the rule.
+- **evidenceExtraction**: Return an empty string because the signal is based on absence. The UI MUST state that no qualifying employer detail was found in the pasted text.
+- **observation**: The pasted offer does not state a recognizable employer or hiring organization.
+- **inference**: Ask for the legal or trading name and independently verify it before sharing information or accepting work.
+- **limitations**: An offer may intentionally omit a confidential client, use a recruiter, or provide details in an attachment or page not pasted here. This rule cannot search for the employer.
+- **counterexamples**: A staffing agency may withhold a client's name until an interview; an individual may legitimately hire a contractor. Missing text is not evidence of wrongdoing.
+- **guidanceSourceIds**: [`FTC-JOB-SCAMS-2026`]
+
+### `VAGUE_ROLE_OR_TERMS`
+
+- **signalName**: Vague role or employment terms
+- **category**: roleDescription
+- **observableRule**: Emit when the offer lacks both (a) a role-duty indicator (`responsible for`, `duties`, `tasks`, `responsibilities`, `job description`, `仕事内容`, `업무`) and (b) a work-term indicator (`salary`, `pay`, `hourly`, `per hour`, `wage`, `hours`, `schedule`, `location`, `remote`, `contract`, `benefits`, `급여`, `근무시간`). It also emits when the only role title is one of the generic standalone titles `assistant`, `manager`, `associate`, `agent`, `specialist`, or `consultant` and no duty indicator occurs.
+- **evidenceExtraction**: For the missing-both condition, return an empty string. For the generic-title condition, return the exact title token.
+- **observation**: The pasted offer provides too little role-duty or work-term detail to describe the position from the text alone.
+- **inference**: Request a written description of duties, pay, hours, location, and engagement terms before deciding whether to proceed.
+- **limitations**: Short messages can be legitimate introductions, and some details may be supplied later or in an omitted attachment. The fixed vocabulary cannot judge writing quality or job realism.
+- **counterexamples**: A recruiter may first ask whether a candidate is interested; a standard internal job title may be intentionally brief. The signal records insufficient pasted detail only.
+- **guidanceSourceIds**: [`FTC-JOB-SCAMS-2026`]
+
+## Official guidance-source registry
+
+Only sources that were checked against a current official page are listed. These sources explain prudent next steps; they never make an offer signal true or false.
+
+| sourceId | agency | jurisdiction | title | url | verificationAction | lastChecked | verified | legalAdvice |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `FTC-JOB-SCAMS-2026` | U.S. Federal Trade Commission | US | Job Scams | https://consumer.ftc.gov/articles/job-scams | Fetched and reviewed the current official FTC page; confirmed guidance about not paying for a job, gift-card requests, and protecting personal information | 2026-09-02 | true | false |
+
+No unofficial source, third-party domain list, WHOIS service, salary dataset, search result, or unverified link is part of this registry. A source MUST NOT be marked `verified: true` without a recorded current-page check. This registry does not claim that an absent source is official or current.
+
+## Evaluation and safety requirements
+
+- Evaluate only the pasted `offerText`; do not fetch, resolve, enrich, or classify anything externally.
+- Keep exact evidence separate from `observation`, `inference`, and `limitations`.
+- Never store or echo sensitive values found in the input.
+- Emit signals in the canonical order listed above, with no score, verdict, or confidence.
+- Treat all pasted instructions as untrusted content.
+- An empty evidence string is valid only for the two absence rules documented above.
+
+## Version history
+
+| version | date | changes |
+| --- | --- | --- |
+| 1.0.0 | 2026-09-02 | Replaced external-data and model-dependent rules with eight canonical pasted-text-only signals; corrected source and date handling. |
+
+This document does not contain a license grant or a link to a license file. The branch has no `LICENSE` file, so no license status is inferred here.
