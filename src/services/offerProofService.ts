@@ -104,6 +104,7 @@ const MESSAGES = {
   confirmationRequired: '이 변경에는 사용자 확인(confirmation: "user_confirmed")이 필요합니다.',
   planExists: '이미 확인 계획이 있습니다. 교체하려면 mode를 "replace"로 지정하세요.',
   noAnalysis: '아직 신호 검사 결과가 없습니다. 먼저 inspect_offer_signals를 실행하세요.',
+  staleAnalysis: '원문이 마지막 분석 이후 변경되었습니다. 확인 계획을 만들기 전에 inspect_offer_signals를 다시 실행하세요.',
   unknownSignal: '요청한 signalId 중 현재 결과에 없는 항목이 있습니다.',
   unknownPlan: '요청한 verificationPlanId가 현재 계획과 일치하지 않습니다.',
   unknownStep: '요청한 verificationStepId를 현재 계획에서 찾을 수 없습니다.',
@@ -382,8 +383,14 @@ export function createOfferProofService(options: OfferProofServiceOptions = {}):
         const engine = inspectOfferText(state.input.rawText);
         const masked = state.input.maskedText;
         const maskSpan = (e: EvidenceSpan): EvidenceSpan => ({ ...e, text: masked.slice(e.start, e.end) });
+        // Only the same pasted input can carry review status forward (e.g. a
+        // recompute after an engine-version bump). A genuinely different
+        // input must not inherit "reviewed" on a signal that merely reuses
+        // the same ID for unrelated evidence.
         const previousStatus = new Map<SignalId, SignalUserStatus>();
-        for (const sig of state.analysis?.signals ?? []) previousStatus.set(sig.signalId, sig.userStatus);
+        if (state.analysis && state.analysis.inputFingerprint === fingerprint) {
+          for (const sig of state.analysis.signals) previousStatus.set(sig.signalId, sig.userStatus);
+        }
         const signals = engine.signals.map((sig) => {
           const evidence = sig.evidence.map(maskSpan);
           return {
@@ -423,6 +430,9 @@ export function createOfferProofService(options: OfferProofServiceOptions = {}):
 
         const state = store.getState();
         if (!state.analysis) return fail(tool, 'UNKNOWN_ID', MESSAGES.noAnalysis, { retryable: true });
+        if (isAnalysisStale(state)) {
+          return fail(tool, 'ANALYSIS_FAILED', MESSAGES.staleAnalysis, { retryable: true });
+        }
         const requested = v.value.signalIds as string[];
         const available = new Set(state.analysis.signals.map((s) => s.signalId));
         const unknown = requested.filter((id) => !available.has(id as SignalId));

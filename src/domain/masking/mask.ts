@@ -18,7 +18,7 @@ interface MaskRule {
   label: string;
   regex: RegExp;
   /** Returns a replacement with exactly the same length as `match`. */
-  mask(match: string, groups: string[]): string;
+  mask(match: string, groups: string[], matchStart: number, fullText: string): string;
 }
 
 const MASK_CHAR = '*';
@@ -57,7 +57,15 @@ function maskPhone(value: string): string {
   return out;
 }
 
-const BUSINESS_REGISTRATION = /^\d{3}-\d{2}-\d{5}$/;
+const BUSINESS_REGISTRATION_SHAPE = /^\d{3}-\d{2}-\d{5}$/;
+/** Text that must precede a business-registration-shaped number for it to be exempt from masking. */
+const BUSINESS_REGISTRATION_CONTEXT = /(?:사업자\s*등록\s*번호|사업자\s*번호|business\s*registration(?:\s*number)?)\s*[:：]?\s*$/i;
+const BUSINESS_REGISTRATION_CONTEXT_WINDOW = 20;
+
+function hasBusinessRegistrationContext(text: string, matchStart: number): boolean {
+  const windowStart = Math.max(0, matchStart - BUSINESS_REGISTRATION_CONTEXT_WINDOW);
+  return BUSINESS_REGISTRATION_CONTEXT.test(text.slice(windowStart, matchStart));
+}
 
 const RULES: MaskRule[] = [
   {
@@ -73,6 +81,12 @@ const RULES: MaskRule[] = [
     mask: (m) => maskDigitsExceptLast(m, 4),
   },
   {
+    kind: 'card_number',
+    label: '카드번호로 보이는 값',
+    regex: /(?<!\d)\d{16}(?!\d)/g,
+    mask: (m) => maskDigitsExceptLast(m, 4),
+  },
+  {
     kind: 'phone',
     label: '전화번호로 보이는 값',
     regex: /(?<![\d+])(?:\+82[- ]?|0)1[016789][- ]?\d{3,4}[- ]?\d{4}(?!\d)|(?<![\d+])0\d{1,2}[- ]\d{3,4}[- ]\d{4}(?!\d)|(?<![\d+])\+\d{1,3}[- ]?\d{2,4}[- ]?\d{3,4}[- ]?\d{3,4}(?!\d)/g,
@@ -81,8 +95,13 @@ const RULES: MaskRule[] = [
   {
     kind: 'bank_account',
     label: '계좌번호로 보이는 값',
+    // A business-registration-shaped number (NNN-NN-NNNNN) is exempt only
+    // when preceded by an explicit "사업자등록번호" label; otherwise the same
+    // shape is a plain account number and must be masked (it is untrusted
+    // pasted text, not a verified registration number).
     regex: /(?<![\d-])\d{2,6}-\d{2,6}-\d{2,8}(?:-\d{2,6})?(?![\d-])/g,
-    mask: (m) => (BUSINESS_REGISTRATION.test(m) ? m : maskDigitsExceptLast(m, 4)),
+    mask: (m, _groups, matchStart, fullText) =>
+      BUSINESS_REGISTRATION_SHAPE.test(m) && hasBusinessRegistrationContext(fullText, matchStart) ? m : maskDigitsExceptLast(m, 4),
   },
   {
     kind: 'bank_account',
@@ -139,7 +158,7 @@ export function maskSensitiveText(text: string): MaskResult {
       const start = m.index;
       const end = start + m[0].length;
       if (overlaps(start, end)) continue;
-      const replacement = rule.mask(m[0], m.slice(1));
+      const replacement = rule.mask(m[0], m.slice(1), start, text);
       if (replacement.length !== m[0].length) {
         throw new Error(`mask rule ${rule.kind} changed the text length`);
       }

@@ -90,7 +90,7 @@ describe('deterministic signal engine', () => {
     expect(ids(SAMPLES.koSecret)).toContain('SENSITIVE_DATA_REQUEST');
   });
 
-  it('detects shortened and unverified links, honouring the official-domain declaration', () => {
+  it('detects shortened and unverified links, and never trusts a pasted official-domain claim', () => {
     const short = inspectOfferText(SAMPLES.koShortLink).signals.find((s) => s.signalId === 'UNVERIFIED_OR_SHORTENED_LINK');
     expect(short?.evidence[0].text).toBe('bit.ly/xxxxxx');
     expect(short?.evidence[0].label).toContain('단축 링크');
@@ -99,13 +99,17 @@ describe('deterministic signal engine', () => {
     expect(lookalike?.evidence[0].text).toBe('www.moel-gov-kr.com');
     expect(lookalike?.evidence[0].label).toContain('공식 링크 아님');
 
+    // A pasted "official domain: X" declaration is untrusted data; it must never
+    // suppress the warning for a link to that same host (AGENTS.md §3).
     const declared = inspectOfferText(SAMPLES.enOfficialDomain).signals.find((s) => s.signalId === 'UNVERIFIED_OR_SHORTENED_LINK');
-    expect(declared?.evidence.map((e) => e.text)).toEqual(['https://bit.ly/abc123']);
+    expect(declared?.evidence.map((e) => e.text)).toEqual(['https://careers.acme.example/apply', 'https://bit.ly/abc123']);
   });
 
   it('applies absence rules for employer details and vague terms', () => {
+    // koShort defers the actual detail ("합격 후 안내") rather than providing it,
+    // so neither employer nor role/work-term coverage is substantive.
     expect(ids(SAMPLES.koShort)).toContain('MISSING_EMPLOYER_DETAILS');
-    expect(ids(SAMPLES.koShort)).not.toContain('VAGUE_ROLE_OR_TERMS');
+    expect(ids(SAMPLES.koShort)).toContain('VAGUE_ROLE_OR_TERMS');
     const account = inspectOfferText(SAMPLES.koAccount);
     const vague = account.signals.find((s) => s.signalId === 'VAGUE_ROLE_OR_TERMS');
     expect(vague?.evidence).toEqual([]);
@@ -113,6 +117,24 @@ describe('deterministic signal engine', () => {
     expect(vague?.sourceLocation).toBeNull();
     expect(ids(SAMPLES.koClean)).not.toContain('MISSING_EMPLOYER_DETAILS');
     expect(ids(SAMPLES.koClean)).not.toContain('VAGUE_ROLE_OR_TERMS');
+  });
+
+  it('does not let a bare self-reference ("we are hiring", "당사") satisfy employer coverage', () => {
+    expect(ids('We are hiring for a great team! Apply today.')).toContain('MISSING_EMPLOYER_DETAILS');
+    expect(ids('당사는 우수한 인재를 찾고 있습니다.')).toContain('MISSING_EMPLOYER_DETAILS');
+  });
+
+  it('does not let a deferred value ("합격 후 공개") satisfy employer or role/work-term coverage', () => {
+    expect(ids('회사명은 합격 후 공개됩니다. 지원 바랍니다.')).toContain('MISSING_EMPLOYER_DETAILS');
+    expect(ids('담당 업무와 급여는 합격 후 안내드립니다.')).toContain('VAGUE_ROLE_OR_TERMS');
+  });
+
+  it('does not combine an urgency term with a consequence term from a distant, unrelated sentence', () => {
+    const text =
+      '지금 바로 지원하세요. 담당 업무는 데이터 입력입니다. 급여는 시급 12,000원입니다. ' +
+      '근무지는 서울입니다. 참고로 다른 부서는 이미 마감했습니다.';
+    const r = inspectOfferText(text);
+    expect(r.signals.map((s) => s.signalId)).not.toContain('URGENCY_PRESSURE');
   });
 
   it('uses a generic standalone title as evidence when duties are missing', () => {

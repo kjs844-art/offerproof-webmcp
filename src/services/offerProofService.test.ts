@@ -97,6 +97,35 @@ describe('service: inspect_offer_signals', () => {
     expect(again.data.analysisId).toBe(ra.data.analysisId);
   });
 
+  it('resets a signal review status when a genuinely different input reuses the same signal ID', () => {
+    const service = makeService();
+    inspect(service, SAMPLES.koUpfront);
+    service.setSignalUserStatus('UPFRONT_PAYMENT', 'reviewed');
+    expect(service.getState().analysis?.signals.find((s) => s.signalId === 'UPFRONT_PAYMENT')?.userStatus).toBe('reviewed');
+
+    // Different offer text that happens to trigger the same signal ID again.
+    const r = inspect(service, SAMPLES.koAccount) as ToolSuccess<InspectOfferSignalsData>;
+    const upfront = r.data.signals.find((s) => s.signalId === 'UPFRONT_PAYMENT');
+    expect(upfront).toBeDefined();
+    expect(upfront?.userStatus).toBe('unreviewed');
+    expect(service.getState().analysis?.signals.find((s) => s.signalId === 'UPFRONT_PAYMENT')?.userStatus).toBe('unreviewed');
+  });
+
+  it('carries a signal review status forward only when the analysed input is byte-for-byte the same', () => {
+    const service = makeService();
+    inspect(service, SAMPLES.koUpfront);
+    service.setSignalUserStatus('UPFRONT_PAYMENT', 'reviewed');
+    const s = service.getState();
+    // replaceExisting: true on the exact same input recomputes but must keep the status.
+    const r = service.inspectOfferSignals({
+      caseId: s.caseId,
+      caseVersion: `v${s.version}`,
+      privacyConfirmed: true,
+      replaceExisting: true,
+    }) as ToolSuccess<InspectOfferSignalsData>;
+    expect(r.data.signals.find((sig) => sig.signalId === 'UPFRONT_PAYMENT')?.userStatus).toBe('reviewed');
+  });
+
   it('fails cleanly when there is no input', () => {
     const service = makeService();
     const s = service.getState();
@@ -199,6 +228,30 @@ describe('service: case id, version conflicts, undo', () => {
 });
 
 describe('service: build_verification_plan and update_verification_step', () => {
+  it('rejects plan creation when the input changed after the analysis it would be based on', () => {
+    const service = makeService();
+    inspect(service, SAMPLES.koUpfront);
+    const analyzed = service.getState();
+    // Edit the textarea after analysis without re-running inspect_offer_signals.
+    service.setInputText(SAMPLES.koClean);
+    service.setPrivacyConfirmed(true);
+    const edited = service.getState();
+    expect(edited.analysis?.analysisId).toBe(analyzed.analysis?.analysisId);
+
+    const stale = expectFailure(
+      service.buildVerificationPlan({
+        caseId: edited.caseId,
+        caseVersion: `v${edited.version}`,
+        signalIds: analyzed.analysis!.signals.map((s) => s.signalId),
+        confirmation: 'user_confirmed',
+      }),
+      'ANALYSIS_FAILED',
+    );
+    expect(stale.error.retryable).toBe(true);
+    expect(service.getState().plan).toBeNull();
+    expect(service.getState().version).toBe(edited.version);
+  });
+
   it('requires confirmation, rejects unknown signals, and starts all steps as todo', () => {
     const service = makeService();
     inspect(service, SAMPLES.koUpfront);

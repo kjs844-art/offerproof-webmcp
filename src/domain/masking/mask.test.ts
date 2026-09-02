@@ -11,19 +11,28 @@ describe('sensitive-data masking', () => {
     expect(findings.map((f) => f.kind)).toEqual(['resident_registration']);
   });
 
-  it('masks bank accounts but leaves business registration numbers alone', () => {
+  it('masks bank accounts but leaves a business registration number alone only with its label present', () => {
     const { masked } = maskSensitiveText(SAMPLES.koAccount);
     expect(masked).toContain('******-**-**1234');
     expect(masked).not.toContain('123456-78-901234');
     const biz = maskSensitiveText('사업자등록번호 123-45-67890');
     expect(biz.masked).toBe('사업자등록번호 123-45-67890');
     expect(biz.findings).toEqual([]);
+
+    // The same NNN-NN-NNNNN shape without the business-registration label is
+    // an ambiguous number pasted as untrusted text, so it must be masked.
+    const ambiguous = maskSensitiveText('계좌번호 123-45-67890');
+    expect(ambiguous.masked).toBe('계좌번호 ***-**-*7890');
+    expect(ambiguous.findings.map((f) => f.kind)).toEqual(['bank_account']);
+    const bare = maskSensitiveText('123-45-67890');
+    expect(bare.masked).toBe('***-**-*7890');
   });
 
-  it('masks phone numbers, cards, emails and secrets', () => {
+  it('masks phone numbers, cards (with or without separators), emails and secrets', () => {
     expect(maskSensitiveText('연락처 010-1234-5678').masked).toBe('연락처 010-****-5678');
     expect(maskSensitiveText('call +1 555 123 4567').masked).toBe('call +1 *** *** 4567');
     expect(maskSensitiveText('card 1234-5678-9012-3456').masked).toBe('card ****-****-****-3456');
+    expect(maskSensitiveText('카드번호 1234567890123456').masked).toBe('카드번호 ************3456');
     expect(maskSensitiveText('mail hong.gildong@gmail.com now').masked).toBe('mail h***********@gmail.com now');
     expect(maskSensitiveText('비밀번호: abc123 입니다').masked).toBe('비밀번호: ****** 입니다');
     expect(maskSensitiveText('password is hunter22').masked).toBe('password is ********');

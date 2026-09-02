@@ -28,7 +28,9 @@ export function SignalCard({ signal, index, selectedForPlan, onToggleSelect, onU
         <h4 id={headingId}>
           <span className="index">{index + 1}.</span> {signal.title}
         </h4>
-        <span className="badge observation">❝ 관찰 사실 (Observation)</span>
+        <span className={`badge ${hasEvidence ? 'observation' : 'absence'}`}>
+          {hasEvidence ? '❝ 관찰 사실 (Observation)' : '△ 부재 관찰 (Absence noted) · 인용 근거 없음'}
+        </span>
         <code className="signal-id">{signal.signalId}</code>
       </header>
 

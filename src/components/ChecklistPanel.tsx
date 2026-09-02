@@ -15,11 +15,39 @@ const PRIORITY_LABELS: Record<VerificationStep['priority'], string> = {
   low: '우선순위 낮음',
 };
 
+interface StepMemoInputProps {
+  memoId: string;
+  initialValue: string;
+  onSave: (value: string) => void;
+}
+
+/**
+ * Keyed by `${verificationStepId}:${step.memo}` in the parent, so whenever
+ * the stored memo changes for a reason other than this input's own save
+ * (undo, or a WebMCP `update_verification_step` call), React remounts this
+ * component with the new value instead of showing a stale local draft.
+ */
+function StepMemoInput({ memoId, initialValue, onSave }: StepMemoInputProps) {
+  const [draft, setDraft] = useState(initialValue);
+  return (
+    <>
+      <input id={memoId} type="text" maxLength={2000} value={draft} onChange={(e) => setDraft(e.target.value)} />
+      <button
+        type="button"
+        className="button secondary small-button"
+        onClick={() => onSave(draft)}
+        disabled={draft === initialValue}
+      >
+        메모 저장
+      </button>
+    </>
+  );
+}
+
 export function ChecklistPanel({ service, state, selectedSignalIds }: Props) {
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
-  const [memoDrafts, setMemoDrafts] = useState<Record<string, string>>({});
 
   const plan = state.plan;
   const analysis = state.analysis;
@@ -122,7 +150,6 @@ export function ChecklistPanel({ service, state, selectedSignalIds }: Props) {
           <ol className="steps">
             {steps.map((step) => {
               const stale = step.signalId !== null && !currentSignalIds.has(step.signalId);
-              const draft = memoDrafts[step.verificationStepId] ?? step.memo ?? '';
               const checkboxId = `chk-${step.verificationStepId}`;
               const memoId = `memo-${step.verificationStepId}`;
               return (
@@ -149,21 +176,12 @@ export function ChecklistPanel({ service, state, selectedSignalIds }: Props) {
                     <label htmlFor={memoId} className="small">
                       메모(선택, 개인정보 제외)
                     </label>
-                    <input
-                      id={memoId}
-                      type="text"
-                      maxLength={2000}
-                      value={draft}
-                      onChange={(e) => setMemoDrafts((d) => ({ ...d, [step.verificationStepId]: e.target.value }))}
+                    <StepMemoInput
+                      key={`${step.verificationStepId}:${step.memo ?? ''}`}
+                      memoId={memoId}
+                      initialValue={step.memo ?? ''}
+                      onSave={(value) => updateStep(step, step.status, value)}
                     />
-                    <button
-                      type="button"
-                      className="button secondary small-button"
-                      onClick={() => updateStep(step, step.status, draft)}
-                      disabled={draft === (step.memo ?? '')}
-                    >
-                      메모 저장
-                    </button>
                   </div>
                 </li>
               );

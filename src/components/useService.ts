@@ -8,21 +8,23 @@ export function useCaseState(service: OfferProofService): CaseState {
 
 const EMPTY_LOG: ToolCallRecord[] = [];
 
+// Keyed per service instance (not a single module-level cache) so two
+// OfferProofService instances whose logs happen to reach the same sequence
+// number never return each other's cached snapshot.
+const logCacheByService = new WeakMap<OfferProofService, { seq: number; log: ToolCallRecord[] }>();
+
 export function useCallLog(service: OfferProofService): ToolCallRecord[] {
   return useSyncExternalStore(
     service.subscribeCalls,
     () => {
       const log = service.getCallLog();
-      return log.length === 0 ? EMPTY_LOG : log[log.length - 1].seq === cachedSeq && cachedLog ? cachedLog : cache(log);
+      if (log.length === 0) return EMPTY_LOG;
+      const lastSeq = log[log.length - 1].seq;
+      const cached = logCacheByService.get(service);
+      if (cached && cached.seq === lastSeq) return cached.log;
+      logCacheByService.set(service, { seq: lastSeq, log });
+      return log;
     },
     () => EMPTY_LOG,
   );
-}
-
-let cachedSeq = -1;
-let cachedLog: ToolCallRecord[] | null = null;
-function cache(log: ToolCallRecord[]): ToolCallRecord[] {
-  cachedSeq = log[log.length - 1].seq;
-  cachedLog = log;
-  return log;
 }

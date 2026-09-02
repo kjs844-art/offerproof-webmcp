@@ -158,6 +158,57 @@ describe('App (WebMCP mode)', () => {
     await waitFor(() => expect(screen.getByText(/\/\d+ 확인 · 계획 ID/).textContent).toMatch(/^0\//));
   });
 
+  it('overwrites a stale local memo draft when the memo changes externally via a WebMCP call', async () => {
+    const mc = createFakeModelContext();
+    render(<Harness mc={mc} seed="memo-sync" />);
+    await screen.findByText(/WebMCP 연결됨/);
+
+    const caseId = screen.getByTestId('case-id').textContent!;
+    fireEvent.change(screen.getByLabelText('구인 제안 원문'), { target: { value: SAMPLES.koUpfront } });
+    fireEvent.click(screen.getByRole('checkbox', { name: /개인정보를 제거하거나 가렸음을 확인/ }));
+    const version = screen.getByTestId('case-version').textContent!;
+
+    let inspect: { ok: boolean; data: { signalIds: string[] }; caseVersion: string } | null = null;
+    await act(async () => {
+      inspect = (await mc.execute('inspect_offer_signals', { caseId, caseVersion: version, privacyConfirmed: true })) as typeof inspect;
+    });
+    let plan: { ok: boolean; data: { verificationPlanId: string; steps: { verificationStepId: string }[] }; caseVersion: string } | null = null;
+    await act(async () => {
+      plan = (await mc.execute('build_verification_plan', {
+        caseId,
+        caseVersion: inspect!.caseVersion,
+        signalIds: inspect!.data.signalIds,
+        confirmation: 'user_confirmed',
+      })) as typeof plan;
+    });
+    await screen.findByText(/\/\d+ 확인 · 계획 ID/);
+
+    const stepId = plan!.data.steps[0].verificationStepId;
+    const memoInput = screen.getAllByLabelText('메모(선택, 개인정보 제외)')[0] as HTMLInputElement;
+
+    // The user is mid-edit, has not clicked "메모 저장" yet.
+    fireEvent.change(memoInput, { target: { value: '사용자가 입력 중인 메모' } });
+    expect(memoInput.value).toBe('사용자가 입력 중인 메모');
+
+    // An agent saves a different memo for the same step in the meantime.
+    await act(async () => {
+      await mc.execute('update_verification_step', {
+        caseId,
+        caseVersion: plan!.caseVersion,
+        verificationPlanId: plan!.data.verificationPlanId,
+        verificationStepId: stepId,
+        status: 'todo',
+        memo: '에이전트가 저장한 메모',
+        confirmation: 'user_confirmed',
+      });
+    });
+
+    await waitFor(() => {
+      const current = screen.getAllByLabelText('메모(선택, 개인정보 제외)')[0] as HTMLInputElement;
+      expect(current.value).toBe('에이전트가 저장한 메모');
+    });
+  });
+
   it('survives StrictMode double registration and unregisters on unmount', async () => {
     const mc = createFakeModelContext();
     const service = makeService('strict');

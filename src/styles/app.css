@@ -334,6 +334,10 @@ input[type='text'] {
 .badge.observation {
   color: var(--observation);
 }
+.badge.absence {
+  color: var(--warning-text);
+  border-style: dotted;
+}
 .badge.guidance {
   color: var(--guidance);
 }

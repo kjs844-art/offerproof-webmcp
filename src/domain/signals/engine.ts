@@ -11,7 +11,6 @@ import {
 import {
   findAll,
   foldCase,
-  hasMatch,
   paragraphIndexAt,
   paragraphStarts,
   sentenceAt,
@@ -23,10 +22,10 @@ import { MANIPULATION_NOTICE_OBSERVATION, SIGNAL_DEFINITIONS } from './registry'
 import {
   CONSEQUENCE_TERMS,
   CRYPTO_GIFT_RULES,
+  DEFERRAL_TERMS,
   EMPLOYER_MARKERS,
   GENERIC_TITLES,
   MANIPULATION_PATTERNS,
-  OFFICIAL_DOMAIN_LABEL,
   OFF_PLATFORM_RULES,
   ROLE_DUTY_TERMS,
   SENSITIVE_DATA_RULES,
@@ -66,9 +65,9 @@ export function inspectOfferText(offerText: string): EngineResult {
   const isBlank = folded.trim().length === 0;
 
   const coverage: AnalysisCoverage = {
-    hasEmployerDetails: !isBlank && hasMatch(EMPLOYER_MARKERS, folded),
-    hasRoleDuty: !isBlank && hasMatch(ROLE_DUTY_TERMS, folded),
-    hasWorkTerms: !isBlank && hasMatch(WORK_TERM_TERMS, folded),
+    hasEmployerDetails: !isBlank && hasSubstantiveMatch(EMPLOYER_MARKERS, sentences),
+    hasRoleDuty: !isBlank && hasSubstantiveMatch(ROLE_DUTY_TERMS, sentences),
+    hasWorkTerms: !isBlank && hasSubstantiveMatch(WORK_TERM_TERMS, sentences),
   };
 
   const evidenceById: Partial<Record<SignalId, EvidenceSpan[] | null>> = {};
@@ -76,7 +75,7 @@ export function inspectOfferText(offerText: string): EngineResult {
   if (!isBlank) {
     evidenceById.UPFRONT_PAYMENT = pairEvidence(UPFRONT_PAYMENT_RULES, sentences, span);
     evidenceById.PAYMENT_IN_CRYPTO_OR_GIFT_CARD = pairEvidence(CRYPTO_GIFT_RULES, sentences, span);
-    evidenceById.URGENCY_PRESSURE = urgencyEvidence(folded, sentences, sentenceSpan, span);
+    evidenceById.URGENCY_PRESSURE = urgencyEvidence(folded, sentences, sentenceSpan);
     evidenceById.OFF_PLATFORM_CONTACT = pairEvidence(OFF_PLATFORM_RULES, sentences, span);
     evidenceById.SENSITIVE_DATA_REQUEST = pairEvidence(SENSITIVE_DATA_RULES, sentences, span);
     evidenceById.UNVERIFIED_OR_SHORTENED_LINK = linkEvidence(folded, span);
@@ -146,37 +145,44 @@ function pairEvidence(rules: PairRule[], sentences: Sentence[], span: SpanFactor
   return null;
 }
 
+/**
+ * Matches only within a single sentence or between two adjacent sentences —
+ * the same locality the other pair rules use — so an urgency term in one
+ * part of a long offer is never combined with an unrelated consequence term
+ * many paragraphs away just because it is the only pair present.
+ */
 function urgencyEvidence(
   folded: string,
   sentences: Sentence[],
   sentenceSpan: SentenceSpanFactory,
-  span: SpanFactory,
 ): EvidenceSpan[] | null {
   const urgency = findAll(URGENCY_TERMS, folded);
   const consequence = findAll(CONSEQUENCE_TERMS, folded);
   if (urgency.length === 0 || consequence.length === 0) return null;
 
-  let best: { a: TextMatch; b: TextMatch; distance: number; first: number } | null = null;
-  for (const a of urgency) {
-    for (const b of consequence) {
-      const distance = Math.max(a.end, b.end) - Math.min(a.start, b.start);
-      const first = Math.min(a.start, b.start);
-      if (!best || distance < best.distance || (distance === best.distance && first < best.first)) {
-        best = { a, b, distance, first };
+  const withSentence = (matches: TextMatch[]): { m: TextMatch; s: Sentence }[] =>
+    matches
+      .map((m) => ({ m, s: sentenceAt(sentences, m.start) }))
+      .filter((x): x is { m: TextMatch; s: Sentence } => x.s !== null);
+  const urgencyBySentence = withSentence(urgency);
+  const consequenceBySentence = withSentence(consequence);
+
+  let sameSentence: Sentence | null = null;
+  let adjacent: [Sentence, Sentence] | null = null;
+  for (const a of urgencyBySentence) {
+    for (const b of consequenceBySentence) {
+      const diff = Math.abs(a.s.index - b.s.index);
+      if (diff === 0) {
+        if (!sameSentence || a.s.start < sameSentence.start) sameSentence = a.s;
+      } else if (diff === 1) {
+        const first = a.s.start <= b.s.start ? [a.s, b.s] : [b.s, a.s];
+        if (!adjacent || first[0].start < adjacent[0].start) adjacent = first as [Sentence, Sentence];
       }
     }
   }
-  if (!best) return null;
-  const sa = sentenceAt(sentences, best.a.start);
-  const sb = sentenceAt(sentences, best.b.start);
-  if (!sa || !sb) {
-    const start = Math.min(best.a.start, best.b.start);
-    const end = Math.max(best.a.end, best.b.end);
-    return [span(start, end)];
-  }
-  if (sa.index === sb.index) return [sentenceSpan(sa)];
-  const ordered = sa.start <= sb.start ? [sa, sb] : [sb, sa];
-  return ordered.map((s) => sentenceSpan(s));
+  if (sameSentence) return [sentenceSpan(sameSentence)];
+  if (adjacent) return adjacent.map((s) => sentenceSpan(s));
+  return null;
 }
 
 function hostOf(token: string): string {
@@ -187,12 +193,14 @@ function hostOf(token: string): string {
   return rest.replace(/^www\./, '');
 }
 
+/**
+ * Flags every URL whose ownership cannot be established from the pasted
+ * text. A pasted "official domain: X" declaration is untrusted data, not
+ * verification (AGENTS.md §3), so it is never allowed to suppress this
+ * warning — official links come only from the allowlist in
+ * `src/domain/resources/registry.ts`.
+ */
 function linkEvidence(folded: string, span: SpanFactory): EvidenceSpan[] | null {
-  const declaredHosts = new Set(findAll(OFFICIAL_DOMAIN_LABEL, folded).map((m) => {
-    const re = new RegExp(OFFICIAL_DOMAIN_LABEL.source);
-    const g = re.exec(m.text);
-    return (g?.[1] ?? '').replace(/^www\./, '');
-  }));
   const spans: EvidenceSpan[] = [];
   const seen = new Set<string>();
   for (const m of findAll(URL_TOKEN, folded)) {
@@ -201,7 +209,6 @@ function linkEvidence(folded: string, span: SpanFactory): EvidenceSpan[] | null 
     const end = m.start + trimmed.length;
     const host = hostOf(trimmed);
     if (host.length === 0) continue;
-    if ([...declaredHosts].some((d) => d.length > 0 && (host === d || host.endsWith(`.${d}`)))) continue;
     if (seen.has(trimmed)) continue;
     seen.add(trimmed);
     const shortened = SHORTENER_HOSTS.some((s) => host === s || host.endsWith(`.${s}`));
@@ -218,6 +225,18 @@ function vagueRoleEvidence(folded: string, coverage: AnalysisCoverage, span: Spa
     if (title) return [span(title.start, title.end, '일반적인 직함만 있음')];
   }
   return null;
+}
+
+/**
+ * True when a marker occurs in a sentence that is not itself a deferral
+ * ("합격 후 안내", "to be announced", …). A label paired only with a promise
+ * to provide the real value later is not the value, so it must not satisfy
+ * coverage (and must not suppress an absence signal).
+ */
+function hasSubstantiveMatch(markerPattern: RegExp, sentences: Sentence[]): boolean {
+  const marker = new RegExp(markerPattern.source, markerPattern.flags.replace('g', ''));
+  const deferral = new RegExp(DEFERRAL_TERMS.source, DEFERRAL_TERMS.flags.replace('g', ''));
+  return sentences.some((s) => marker.test(s.text) && !deferral.test(s.text));
 }
 
 function manipulationNotices(

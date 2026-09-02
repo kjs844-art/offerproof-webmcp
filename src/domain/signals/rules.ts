@@ -132,17 +132,28 @@ export const SHORTENER_HOSTS = [
   'vo.la',
   'url.kr',
 ];
-export const OFFICIAL_DOMAIN_LABEL = /(?:official domain|공식 도메인)\s*[:：]\s*([a-z0-9.-]+\.[a-z]{2,})/g;
 
 /* ------------------------------------------------------------------ */
 /* MISSING_EMPLOYER_DETAILS                                            */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Only markers that structurally carry (or require) an actual name, not bare
+ * self-reference. "our company", "we are", "당사", "본사" etc. were removed:
+ * they match without identifying who the employer is (AGENTS.md §3 — pasted
+ * text is untrusted; a claim of identity is not identification).
+ */
 export const EMPLOYER_MARKERS = rx(
+  latin('inc\\.?|ltd\\.?|llc|corp\\.?|corporation|co\\.,? ?ltd\\.?|gmbh|pty|plc|employer:|company:'),
+  '주식회사|\\(주\\)|㈜|유한회사|법인|회사명|기업명|사업자 ?등록 ?번호|사업자번호|고용주|채용 ?기업|소속 ?[:：]|회사 ?[:：]|기업 ?[:：]|株式会社',
+);
+
+/** Phrases that defer the actual detail rather than provide it (e.g. "합격 후 안내"). */
+export const DEFERRAL_TERMS = rx(
   latin(
-    'company|employer|inc\\.?|ltd\\.?|llc|corp\\.?|corporation|co\\.,? ?ltd\\.?|gmbh|pty|plc|our company|we are|hiring for|employer:|company:',
+    'to be announced|to be disclosed|to be determined|tba|tbd|will be (?:shared|provided|announced) later|details? (?:to follow|later)',
   ),
-  '주식회사|\\(주\\)|㈜|유한회사|법인|회사명|기업명|사업자 ?등록 ?번호|사업자번호|고용주|채용 ?기업|당사|저희 회사|우리 회사|본사|소속 ?[:：]|회사 ?[:：]|기업 ?[:：]|株式会社',
+  '추후|합격\\s*후|면접\\s*후|선발\\s*후|채용\\s*후|공개\\s*예정|안내\\s*예정',
 );
 
 /* ------------------------------------------------------------------ */
