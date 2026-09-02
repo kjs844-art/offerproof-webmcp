@@ -1,6 +1,6 @@
 # OfferProof
 
-OfferProof는 구인·채용 제안에서 위험 신호를 찾고, 사용자가 안전하게 사실을 확인할 수 있도록 검증 계획을 만들어 주는 WebMCP 웹앱입니다.
+OfferProof는 구인·채용 제안에서 **확인이 필요한 신호**를 원문 근거와 함께 정리하고, 사용자가 안전하게 사실을 확인할 수 있도록 검증 계획을 만드는 WebMCP 웹앱입니다.
 
 ## 안전 원칙
 
@@ -11,9 +11,16 @@ OfferProof는 구인·채용 제안에서 위험 신호를 찾고, 사용자가 
 
 ## 현재 상태
 
-저장소 및 협업 브랜치 초기 설정 단계입니다. 구현은 아직 시작하지 않았습니다.
+다중 AI 협업 온보딩 단계입니다. 애플리케이션 구현은 아직 시작하지 않았습니다.
 
 ## 협업 방식
 
-각 작업자는 전용 브랜치에서 작업하고 Pull Request로 `codex/firstvibe/integration`에 모읍니다. 검증이 끝난 변경만 `main`에 반영합니다.
+Claude, Gemini, Cursor, Copilot, Codex 등 어떤 도구를 사용하더라도 먼저 [`AGENTS.md`](AGENTS.md)를 읽습니다. 각 작업자는 AI별·작업별 고유 브랜치에서 작업하고 Pull Request로 `codex/firstvibe/integration`에 모읍니다. 검증이 끝난 변경만 `main`에 반영합니다.
 
+새 작업자는 다음 순서로 시작합니다.
+
+1. `AGENTS.md`
+2. `docs/PROJECT.md`
+3. `docs/PROJECT_STATE.md`
+4. `docs/WORKSTREAMS.md`
+5. 자신에게 지정된 GitHub Issue
