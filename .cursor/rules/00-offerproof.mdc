@@ -1,0 +1,6 @@
+---
+description: Canonical OfferProof repository rules
+alwaysApply: true
+---
+
+Read and follow `/AGENTS.md` before taking any action. It is the canonical repository contract. Read every project document and assigned Issue listed there before editing.
