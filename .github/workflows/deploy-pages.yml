@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - codex/firstvibe/integration
+      - main
   workflow_dispatch:
 
 permissions:

@@ -19,6 +19,7 @@
 - `vite.config.ts`
 - `.github/workflows/deploy-pages.yml`
 - `README.md`
+- `docs/PROJECT_STATE.md`
 - `docs/handoffs/14-codex-pages-prep.md`
 
 ## 검증
