@@ -3,8 +3,8 @@
 ## Build and repository
 
 - [x] Core MVP implemented on the integration branch.
-- [x] Five WebMCP tools registered locally; the core summary, plan, and step-update flow was exercised.
-- [x] Automated tests pass: 22/22.
+- [x] Six WebMCP tools implemented; the original five-tool set was registered locally and the sixth is contract-tested.
+- [x] Automated tests pass: 28/28.
 - [x] Production build passes.
 - [x] Production dependency audit reports zero vulnerabilities.
 - [x] GitHub Pages workflow prepared in PR #15.
@@ -20,9 +20,10 @@
 - [ ] Verify the public root page returns HTTP 200.
 - [ ] Verify JavaScript and CSS assets return HTTP 200.
 - [ ] Run the complete manual sample flow on the deployed URL.
-- [ ] Verify all five WebMCP tools on the deployed URL.
+- [ ] Verify all six WebMCP tools on the deployed URL.
 - [ ] Verify mutation rejection before consent and success after consent.
-- [ ] Verify no full offer text or secret value is returned by tools.
+- [ ] Verify read, analysis, blocked mutation, and successful mutation receipts appear without raw inputs.
+- [ ] Verify no dedicated raw-text field or secret value is returned by tools; sanitized evidence sentences are expected after consent.
 - [ ] Test the deployed UI at a narrow mobile width.
 
 ## Video and media
@@ -35,6 +36,7 @@
 - [ ] Capture a clean landscape hero image.
 - [ ] Capture analysis evidence and consent-gate screenshots.
 - [ ] Capture the WebMCP tool list and visible tool-result screenshot.
+- [ ] Capture the action-receipt timeline showing one blocked and one successful mutation.
 
 ## Devpost
 
