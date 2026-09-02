@@ -3,7 +3,7 @@
 ## Build and repository
 
 - [x] Core MVP implemented on the integration branch.
-- [x] Five WebMCP tools registered and exercised locally.
+- [x] Five WebMCP tools registered locally; the core summary, plan, and step-update flow was exercised.
 - [x] Automated tests pass: 22/22.
 - [x] Production build passes.
 - [x] Production dependency audit reports zero vulnerabilities.

@@ -31,7 +31,7 @@ The current MVP supports eight canonical signal types:
 - missing employer details; and
 - vague job terms.
 
-Every detected signal includes a supporting excerpt, a factual observation, a limited inference, and an explicit limitation. OfferProof never produces a fraud verdict, safety verdict, confidence score, automatic report, payment, message, or external action.
+Every detected signal includes supporting evidence, a factual observation, a limited inference, and an explicit limitation. When evidence could contain a sensitive value, OfferProof returns a fixed redacted placeholder instead of reproducing that excerpt. OfferProof never produces a fraud verdict, safety verdict, confidence score, automatic report, payment, message, or external action.
 
 The user can generate a verification checklist, mark steps complete, undo a change, and open curated Korean official resources for manual review.
 
@@ -73,7 +73,7 @@ We built a working browser-local MVP that demonstrates WebMCP as more than a col
 
 OfferProof exposes meaningful, stateful operations while retaining human control. It can reject an unauthorized agent mutation, generate a verification plan after consent, update one checklist item, preserve progress across reanalysis, lock obsolete steps, and safely undo changes.
 
-All five tools were registered and exercised in a local WebMCP-enabled browser test. The application also works as a manual interface without WebMCP.
+All five tools were registered in a local WebMCP-enabled browser test. The core read-and-mutation flow was exercised with `get_case_summary`, `build_verification_plan`, and `update_verification_step`, including rejection before consent and visible success after consent. The application also works as a manual interface without WebMCP.
 
 We are especially proud that the product avoids sensational verdicts. Every signal stays connected to observable source text and communicates what the system cannot conclude.
 
