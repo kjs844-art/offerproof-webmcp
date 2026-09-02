@@ -167,6 +167,9 @@ test('도구 메타데이터는 지원되는 WebMCP 힌트만 사용한다', () 
   }
   assert.equal(harness.tool('get_case_summary').annotations?.untrustedContentHint, true);
   assert.equal(harness.tool('inspect_offer_signals').annotations?.untrustedContentHint, true);
+  assert.equal(harness.tool('get_case_summary').annotations?.readOnlyHint, false);
+  assert.equal(harness.tool('get_official_resources').annotations?.readOnlyHint, false);
+  assert.equal(harness.tool('get_action_receipts').annotations?.readOnlyHint, true);
 });
 
 test('작업 영수증은 최신순으로 최대 개수만 보존한다', () => {

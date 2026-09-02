@@ -98,9 +98,9 @@ export function createOfferProofTools(api: OfferProofToolApi): WebMcpTool[] {
   return [
     {
       name: 'get_case_summary',
-      description: '현재 사례의 개인정보 보호 요약, 신호, 확인 단계 상태를 읽습니다. 원문 필드는 반환하지 않으며 민감값을 가린 신호 근거만 포함합니다.',
+      description: '현재 사례의 개인정보 보호 요약, 신호, 확인 단계 상태를 읽고 현재 탭에 안전한 작업 영수증을 남깁니다. 원문 필드는 반환하지 않으며 민감값을 가린 신호 근거만 포함합니다.',
       inputSchema: EMPTY_SCHEMA,
-      annotations: { readOnlyHint: true, untrustedContentHint: true },
+      annotations: { readOnlyHint: false, untrustedContentHint: true },
       execute: () => {
         try {
           const state = api.getState();
@@ -225,9 +225,9 @@ export function createOfferProofTools(api: OfferProofToolApi): WebMcpTool[] {
     },
     {
       name: 'get_official_resources',
-      description: '사전에 확인한 공식 안내 링크를 읽습니다. 링크를 자동으로 열거나 신고하지 않습니다.',
+      description: '사전에 확인한 공식 안내 링크를 읽고 현재 탭에 안전한 작업 영수증을 남깁니다. 링크를 자동으로 열거나 신고하지 않습니다.',
       inputSchema: EMPTY_SCHEMA,
-      annotations: { readOnlyHint: true, untrustedContentHint: false },
+      annotations: { readOnlyHint: false, untrustedContentHint: false },
       execute: () => {
         try {
           const resources = api.getResources();

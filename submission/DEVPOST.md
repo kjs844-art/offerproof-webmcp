@@ -44,9 +44,9 @@ Through WebMCP, an agent can use six page-native tools:
 - `get_official_resources`
 - `get_action_receipts`
 
-Read operations and mutation operations are separated. Checklist mutations are rejected until the user explicitly enables agent changes on the page. The same core workflow remains available manually when WebMCP is unavailable.
+Information retrieval and checklist mutation are separated. Retrieval never changes the case or checklist, but it appends a privacy-safe local receipt, so receipt-producing tools are not advertised as side-effect-free. Checklist mutations are rejected until the user explicitly enables agent changes on the page. The same core workflow remains available manually when WebMCP is unavailable.
 
-Every WebMCP read, analysis, or mutation produces a privacy-safe action receipt showing the tool, operation class, success or blocked outcome, case ID, and version. Receipts never store raw arguments, offer text, evidence, secrets, or personal data. They stay in the current tab, are capped at 20, and reset with a new review.
+Each call to the original five operational WebMCP tools produces a privacy-safe action receipt showing the tool, operation class, success or blocked outcome, case ID, and version. The sixth tool reads those receipts without recursively logging itself. Receipts never store raw arguments, offer text, evidence, secrets, or personal data. They stay in the current tab, are capped at 20, and reset with a new review.
 
 ## How we built it
 
