@@ -99,8 +99,8 @@ Expected security behavior:
 - The embedded instruction is treated only as untrusted offer text. It does not change application logic and does not create an invented prompt-injection signal.
 - The sensitive-data request is detected from the original text.
 - The evidence exposed in the signal is replaced with `[민감정보 요청이 포함된 문장 가림]`.
-- Tool results never include the full original or masked offer text.
-- `get_case_summary({})` may return the input character count, sanitized signals, checklist state, case ID, and numeric version only after the privacy confirmation gate.
+- Tool results do not include dedicated `originalText` or `maskedText` fields. After the privacy confirmation gate, they may include sanitized evidence sentences; a short one-sentence input can therefore appear in full as evidence.
+- `get_case_summary({})` may return the input character count, sanitized signal evidence, checklist state, case ID, and numeric version only after the privacy confirmation gate.
 
 ## Manual fallback
 
