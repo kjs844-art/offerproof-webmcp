@@ -3,8 +3,12 @@
   "private": true,
   "version": "0.0.1",
   "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
   "scripts": {
     "dev": "vite",
+    "test": "node --test tests/domain-engine.test.ts tests/case-state.test.ts tests/webmcp-tools.test.ts",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },

@@ -11,7 +11,39 @@ OfferProof는 구인·채용 제안에서 **확인이 필요한 신호**를 원�
 
 ## 현재 상태
 
-다중 AI 협업 온보딩 단계입니다. 애플리케이션 구현은 아직 시작하지 않았습니다.
+브라우저 로컬 MVP가 구현되어 있습니다. 사용자가 구인 제안문을 붙여 넣으면 고정된 규칙으로 확인 신호와 원문 근거를 정리하고, 검증 체크리스트를 만들 수 있습니다. 입력은 서버로 전송하지 않으며 자동 신고·결제·외부 페이지 실행을 하지 않습니다.
+
+현재 등록되는 WebMCP 도구는 다음 5개입니다.
+
+- `get_case_summary`
+- `inspect_offer_signals`
+- `build_verification_plan`
+- `update_verification_step`
+- `get_official_resources`
+
+체크리스트를 변경하는 도구는 페이지 안에서 사용자가 먼저 허용해야 합니다.
+
+## 로컬 실행
+
+Node.js 22.18 이상이 필요합니다.
+
+```powershell
+npm ci
+npm run dev
+```
+
+브라우저에서 Vite가 안내하는 로컬 주소를 엽니다.
+
+## 검증
+
+```powershell
+npm test
+npm run build
+npm audit --omit=dev
+git diff --check
+```
+
+현재 자동 테스트는 개인정보 확인과 에이전트 변경 게이트, 결정적 신호 분석, 원문·문맥형 비밀값 마스킹, 사례·버전 충돌, 동의를 복원하지 않는 단조 증가 실행 취소, 오래된 분석·단계 차단, 체크리스트 진행 상태 보존, WebMCP 도구 응답을 검사합니다.
 
 ## 협업 방식
 
