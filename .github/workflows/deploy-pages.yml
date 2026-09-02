@@ -3,7 +3,6 @@ name: Deploy OfferProof to GitHub Pages
 on:
   push:
     branches:
-      - codex/firstvibe/integration
       - main
   workflow_dispatch:
 
