@@ -98,7 +98,7 @@ export function createOfferProofTools(api: OfferProofToolApi): WebMcpTool[] {
   return [
     {
       name: 'get_case_summary',
-      description: '현재 사례의 개인정보 보호 요약, 신호, 확인 단계 상태를 읽습니다. 전체 입력문은 반환하지 않습니다.',
+      description: '현재 사례의 개인정보 보호 요약, 신호, 확인 단계 상태를 읽습니다. 원문 필드는 반환하지 않으며 민감값을 가린 신호 근거만 포함합니다.',
       inputSchema: EMPTY_SCHEMA,
       annotations: { readOnlyHint: true, untrustedContentHint: true },
       execute: () => {
@@ -244,7 +244,7 @@ export function createOfferProofTools(api: OfferProofToolApi): WebMcpTool[] {
     },
     {
       name: 'get_action_receipts',
-      description: '최근 WebMCP 분석·변경 작업의 개인정보 보호 영수증을 최신순으로 읽습니다. 원문, 도구 인수, 근거는 반환하지 않습니다.',
+      description: '최근 WebMCP 읽기·분석·변경 작업의 개인정보 보호 영수증을 최신순으로 읽습니다. 원문, 도구 인수, 근거는 반환하지 않습니다.',
       inputSchema: EMPTY_SCHEMA,
       annotations: { readOnlyHint: true, untrustedContentHint: false },
       execute: () => {

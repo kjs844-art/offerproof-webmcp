@@ -309,7 +309,7 @@ function App() {
                 </div>
                 <span className="receipt-count">최근 {actionReceipts.length}/{MAX_ACTION_RECEIPTS}</span>
               </div>
-              <p>에이전트가 실행한 분석·변경의 결과만 남깁니다. 원문, 도구 인수, 근거, 개인정보는 저장하지 않습니다.</p>
+              <p>에이전트가 실행한 읽기·분석·변경의 결과만 남깁니다. 원문, 도구 인수, 근거, 개인정보는 저장하지 않습니다.</p>
               {actionReceipts.length === 0 ? (
                 <p className="receipt-empty">아직 WebMCP 작업 영수증이 없습니다.</p>
               ) : (
