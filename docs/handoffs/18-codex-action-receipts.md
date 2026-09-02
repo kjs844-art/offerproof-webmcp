@@ -31,7 +31,7 @@
 
 - `npm test`: PASS, 28/28 tests (the original 22 plus 6 receipt tests)
 - `npm run build`: PASS
-- `npm audit`: 3 development-dependency vulnerabilities (2 moderate, 1 high); not claimed clean
+- `npm audit`: development-only vulnerabilities remain; the full audit is not claimed clean (see the current audit output)
 - `npm audit --omit=dev`: PASS, 0 production vulnerabilities
 - `git diff --check`: PASS
 
