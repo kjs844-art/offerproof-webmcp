@@ -13,15 +13,17 @@ OfferProof는 구인·채용 제안에서 **확인이 필요한 신호**를 원�
 
 브라우저 로컬 MVP가 구현되어 있습니다. 사용자가 구인 제안문을 붙여 넣으면 고정된 규칙으로 확인 신호와 원문 근거를 정리하고, 검증 체크리스트를 만들 수 있습니다. 입력은 서버로 전송하지 않으며 자동 신고·결제·외부 페이지 실행을 하지 않습니다.
 
-현재 등록되는 WebMCP 도구는 다음 5개입니다.
+현재 등록되는 WebMCP 도구는 다음 6개입니다.
 
 - `get_case_summary`
 - `inspect_offer_signals`
 - `build_verification_plan`
 - `update_verification_step`
 - `get_official_resources`
+- `get_action_receipts`
 
 체크리스트를 변경하는 도구는 페이지 안에서 사용자가 먼저 허용해야 합니다.
+읽기·분석·변경 도구의 허용·차단 결과는 민감한 입력이나 인수 없이 현재 탭의 작업 영수증에 최대 20개까지 기록됩니다.
 
 ## 로컬 실행
 

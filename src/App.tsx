@@ -7,6 +7,12 @@ import {
   updateOfferText,
   updateVerificationStep,
 } from './domain/caseState';
+import {
+  clearActionReceipts,
+  MAX_ACTION_RECEIPTS,
+  prependActionReceipt,
+  type ActionReceipt,
+} from './domain/actionReceipts';
 import type { OfferCase, OfficialResource, SignalId, VerificationStatus } from './domain/types';
 import { useOfferProofTools, type OfferProofToolApi } from './webmcp/useOfferProofTools';
 
@@ -36,17 +42,31 @@ const OFFICIAL_RESOURCES: OfficialResource[] = [
   },
 ];
 
+const RECEIPT_TIME_FORMAT = new Intl.DateTimeFormat('ko-KR', {
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+});
+
 function App() {
   const [offerCase, setOfferCase] = useState<OfferCase>(() => createOfferCase());
+  const [actionReceipts, setActionReceipts] = useState<ActionReceipt[]>(() => clearActionReceipts());
   const [notice, setNotice] = useState('제안 원문을 붙여넣고 개인정보를 확인해 주세요.');
   const [previousCase, setPreviousCase] = useState<OfferCase | null>(null);
   const caseRef = useRef(offerCase);
+  const receiptsRef = useRef(actionReceipts);
 
   const commit = (change: (current: OfferCase) => OfferCase) => {
     const next = change(caseRef.current);
     caseRef.current = next;
     setOfferCase(next);
     return next;
+  };
+
+  const recordReceipt = (receipt: ActionReceipt) => {
+    const next = prependActionReceipt(receiptsRef.current, receipt);
+    receiptsRef.current = next;
+    setActionReceipts(next);
   };
 
   const toolApi = useMemo<OfferProofToolApi>(() => ({
@@ -71,6 +91,8 @@ function App() {
       return next;
     },
     getResources: () => OFFICIAL_RESOURCES,
+    getReceipts: () => receiptsRef.current,
+    recordReceipt,
   }), []);
 
   const webMcpStatus = useOfferProofTools(toolApi);
@@ -119,8 +141,11 @@ function App() {
 
   const reset = () => {
     const fresh = createOfferCase();
+    const noReceipts = clearActionReceipts();
     caseRef.current = fresh;
+    receiptsRef.current = noReceipts;
     setOfferCase(fresh);
+    setActionReceipts(noReceipts);
     setPreviousCase(null);
     setNotice('새 검토를 시작했습니다.');
   };
@@ -132,7 +157,7 @@ function App() {
         <div className="topbar-actions">
           <span className={`status-pill status-${webMcpStatus}`}>
             <span aria-hidden="true">●</span>{' '}
-            {webMcpStatus === 'registered' && 'WebMCP 도구 5개 연결됨'}
+            {webMcpStatus === 'registered' && 'WebMCP 도구 6개 연결됨'}
             {webMcpStatus === 'checking' && 'WebMCP 확인 중'}
             {webMcpStatus === 'unsupported' && '수동 모드'}
             {webMcpStatus === 'error' && 'WebMCP 연결 오류'}
@@ -276,8 +301,36 @@ function App() {
               </section>
             )}
 
+            <section className="action-receipts" aria-labelledby="receipts-heading">
+              <div className="subheading-row">
+                <div>
+                  <p className="step-label">STEP 4</p>
+                  <h3 id="receipts-heading">WebMCP 작업 영수증</h3>
+                </div>
+                <span className="receipt-count">최근 {actionReceipts.length}/{MAX_ACTION_RECEIPTS}</span>
+              </div>
+              <p>에이전트가 실행한 분석·변경의 결과만 남깁니다. 원문, 도구 인수, 근거, 개인정보는 저장하지 않습니다.</p>
+              {actionReceipts.length === 0 ? (
+                <p className="receipt-empty">아직 WebMCP 작업 영수증이 없습니다.</p>
+              ) : (
+                <ol className="receipt-list" aria-live="polite">
+                  {actionReceipts.map((receipt) => (
+                    <li className={`receipt-row receipt-${receipt.outcome}`} key={receipt.receiptId}>
+                      <div className="receipt-title-row">
+                        <strong>{receipt.outcome === 'success' ? '적용됨' : '차단됨'}</strong>
+                        <time dateTime={receipt.createdAt}>{RECEIPT_TIME_FORMAT.format(new Date(receipt.createdAt))}</time>
+                      </div>
+                      <code>{receipt.toolName}</code>
+                      <p>{receipt.message}</p>
+                      <small>{receipt.toolClass === 'read' ? '읽기' : receipt.toolClass === 'analysis' ? '분석' : '변경'} · {receipt.caseId} · v{receipt.caseVersion}</small>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </section>
+
             <section className="resources" aria-labelledby="resources-heading">
-              <p className="step-label">STEP 4</p><h3 id="resources-heading">공식 자료에서 직접 확인</h3>
+              <p className="step-label">STEP 5</p><h3 id="resources-heading">공식 자료에서 직접 확인</h3>
               <p>자동 신고나 판정을 하지 않습니다. 적용 범위와 최신 내용을 직접 확인하세요.</p>
               <div className="resource-list">
                 {OFFICIAL_RESOURCES.map((resource) => (

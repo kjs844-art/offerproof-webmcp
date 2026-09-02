@@ -1,4 +1,10 @@
 import { useEffect, useState } from 'react';
+import {
+  createActionReceipt,
+  type ActionReceipt,
+  type ReceiptOutcome,
+  type ReceiptToolName,
+} from '../domain/actionReceipts.ts';
 import { SIGNAL_IDS, type OfferCase, type OfficialResource, type SignalId, type VerificationStatus } from '../domain/types.ts';
 
 type JsonSchema = Record<string, unknown>;
@@ -33,6 +39,8 @@ export interface OfferProofToolApi {
   buildPlan: (caseId: string, expectedVersion: number, signalIds?: SignalId[]) => OfferCase;
   updateStep: (caseId: string, stepId: string, status: VerificationStatus, expectedVersion: number) => OfferCase;
   getResources: () => OfficialResource[];
+  getReceipts: () => ActionReceipt[];
+  recordReceipt: (receipt: ActionReceipt) => void;
 }
 
 export type WebMcpStatus = 'checking' | 'registered' | 'unsupported' | 'error';
@@ -77,6 +85,15 @@ function requirePrivacy(state: OfferCase): void {
   }
 }
 
+function recordOutcome(
+  api: OfferProofToolApi,
+  toolName: ReceiptToolName,
+  outcome: ReceiptOutcome,
+  state: Pick<OfferCase, 'caseId' | 'caseVersion'> = api.getState(),
+): void {
+  api.recordReceipt(createActionReceipt(toolName, outcome, state));
+}
+
 export function createOfferProofTools(api: OfferProofToolApi): WebMcpTool[] {
   return [
     {
@@ -88,6 +105,7 @@ export function createOfferProofTools(api: OfferProofToolApi): WebMcpTool[] {
         try {
           const state = api.getState();
           requirePrivacy(state);
+          recordOutcome(api, 'get_case_summary', 'success', state);
           return ok(`현재 사례는 v${state.caseVersion}이며 확인 신호 ${state.signals.length}개가 있습니다.`, {
             ok: true,
             caseId: state.caseId,
@@ -99,6 +117,7 @@ export function createOfferProofTools(api: OfferProofToolApi): WebMcpTool[] {
             verificationSteps: state.verificationSteps,
           });
         } catch (error) {
+          recordOutcome(api, 'get_case_summary', 'blocked');
           return failure(error);
         }
       },
@@ -111,6 +130,7 @@ export function createOfferProofTools(api: OfferProofToolApi): WebMcpTool[] {
       execute: () => {
         try {
           const state = api.inspect();
+          recordOutcome(api, 'inspect_offer_signals', 'success', state);
           return ok(`확인이 필요한 신호 ${state.signals.length}개를 찾았습니다. 이는 사기 또는 안전 판정이 아닙니다.`, {
             ok: true,
             caseId: state.caseId,
@@ -119,6 +139,7 @@ export function createOfferProofTools(api: OfferProofToolApi): WebMcpTool[] {
             signals: state.signals,
           });
         } catch (error) {
+          recordOutcome(api, 'inspect_offer_signals', 'blocked');
           return failure(error);
         }
       },
@@ -147,6 +168,7 @@ export function createOfferProofTools(api: OfferProofToolApi): WebMcpTool[] {
           if (typeof input.caseId !== 'string') throw new Error('INVALID_INPUT: caseId가 필요합니다.');
           if (!Number.isInteger(input.expectedVersion)) throw new Error('INVALID_INPUT: expectedVersion 정수가 필요합니다.');
           const state = api.buildPlan(input.caseId, input.expectedVersion as number, asSignalIds(input.signalIds));
+          recordOutcome(api, 'build_verification_plan', 'success', state);
           return ok(`확인 체크리스트 ${state.verificationSteps.length}개를 만들었습니다.`, {
             ok: true,
             caseId: state.caseId,
@@ -155,6 +177,7 @@ export function createOfferProofTools(api: OfferProofToolApi): WebMcpTool[] {
             verificationSteps: state.verificationSteps,
           });
         } catch (error) {
+          recordOutcome(api, 'build_verification_plan', 'blocked');
           return failure(error);
         }
       },
@@ -186,6 +209,7 @@ export function createOfferProofTools(api: OfferProofToolApi): WebMcpTool[] {
           if (input.status !== 'todo' && input.status !== 'done') throw new Error('status는 todo 또는 done이어야 합니다.');
           if (!Number.isInteger(input.expectedVersion)) throw new Error('INVALID_INPUT: expectedVersion 정수가 필요합니다.');
           const state = api.updateStep(input.caseId, input.stepId, input.status, input.expectedVersion as number);
+          recordOutcome(api, 'update_verification_step', 'success', state);
           return ok('확인 항목 상태를 변경했습니다.', {
             ok: true,
             caseId: state.caseId,
@@ -194,6 +218,7 @@ export function createOfferProofTools(api: OfferProofToolApi): WebMcpTool[] {
             changedFields: ['status'],
           });
         } catch (error) {
+          recordOutcome(api, 'update_verification_step', 'blocked');
           return failure(error);
         }
       },
@@ -204,10 +229,29 @@ export function createOfferProofTools(api: OfferProofToolApi): WebMcpTool[] {
       inputSchema: EMPTY_SCHEMA,
       annotations: { readOnlyHint: true, untrustedContentHint: false },
       execute: () => {
-        const resources = api.getResources();
-        return ok(`공식 확인 자료 ${resources.length}개를 반환합니다. 사용자가 직접 열고 적용 범위를 판단해야 합니다.`, {
+        try {
+          const resources = api.getResources();
+          recordOutcome(api, 'get_official_resources', 'success');
+          return ok(`공식 확인 자료 ${resources.length}개를 반환합니다. 사용자가 직접 열고 적용 범위를 판단해야 합니다.`, {
+            ok: true,
+            resources,
+          });
+        } catch (error) {
+          recordOutcome(api, 'get_official_resources', 'blocked');
+          return failure(error);
+        }
+      },
+    },
+    {
+      name: 'get_action_receipts',
+      description: '최근 WebMCP 분석·변경 작업의 개인정보 보호 영수증을 최신순으로 읽습니다. 원문, 도구 인수, 근거는 반환하지 않습니다.',
+      inputSchema: EMPTY_SCHEMA,
+      annotations: { readOnlyHint: true, untrustedContentHint: false },
+      execute: () => {
+        const receipts = api.getReceipts().map((receipt) => ({ ...receipt }));
+        return ok(`최근 WebMCP 작업 영수증 ${receipts.length}개를 반환합니다.`, {
           ok: true,
-          resources,
+          receipts,
         });
       },
     },
