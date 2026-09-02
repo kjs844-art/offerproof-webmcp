@@ -35,27 +35,30 @@ Every detected signal includes supporting evidence, a factual observation, a lim
 
 The user can generate a verification checklist, mark steps complete, undo a change, and open curated Korean official resources for manual review.
 
-Through WebMCP, an agent can use five page-native tools:
+Through WebMCP, an agent can use six page-native tools:
 
 - `get_case_summary`
 - `inspect_offer_signals`
 - `build_verification_plan`
 - `update_verification_step`
 - `get_official_resources`
+- `get_action_receipts`
 
 Read operations and mutation operations are separated. Checklist mutations are rejected until the user explicitly enables agent changes on the page. The same core workflow remains available manually when WebMCP is unavailable.
+
+Every WebMCP read, analysis, or mutation produces a privacy-safe action receipt showing the tool, operation class, success or blocked outcome, case ID, and version. Receipts never store raw arguments, offer text, evidence, secrets, or personal data. They stay in the current tab, are capped at 20, and reset with a new review.
 
 ## How we built it
 
 OfferProof is a Vite, React, and TypeScript client-side application with no required backend or API key.
 
-The analysis engine uses deterministic Korean-language patterns so the same input produces the same ordered signals. Detection runs against the original input, while evidence shown to the interface and WebMCP tools is masked before being returned. Full offer text is intentionally excluded from the case-summary tool.
+The analysis engine uses deterministic Korean-language patterns so the same input produces the same ordered signals. Detection runs against the original input, while evidence shown to the interface and WebMCP tools is masked before being returned. The case-summary tool excludes dedicated raw and masked full-text fields, while returning consented, sanitized evidence sentences for detected signals.
 
-The page registers five typed tools through `document.modelContext`. Their JSON schemas restrict inputs with required fields, enums, item limits, and `additionalProperties: false`.
+The page registers six typed tools through `document.modelContext`. Their JSON schemas restrict inputs with required fields, enums, item limits, and `additionalProperties: false`.
 
 Each review receives a unique case ID and a monotonically increasing numeric version. Agent mutations must provide the current ID and expected version, preventing stale requests from changing a new or edited case. Editing the offer invalidates the previous analysis while preserving and locking earlier checklist history. Undo creates a new version and never restores consent that the user has since withdrawn.
 
-The automated suite contains 22 passing tests covering deterministic analysis, sensitive-value masking, prompt-injection text handling, consent gates, case and version conflicts, stale analysis, checklist preservation, undo behavior, and WebMCP tool responses. The production build and production-dependency audit also pass locally.
+The automated suite contains 28 passing tests covering deterministic analysis, sensitive-value masking, prompt-injection text handling, consent gates, case and version conflicts, stale analysis, checklist preservation, undo behavior, WebMCP tool responses, and action-receipt privacy. The production build and production-dependency audit also pass locally.
 
 ## Challenges we ran into
 
@@ -73,7 +76,7 @@ We built a working browser-local MVP that demonstrates WebMCP as more than a col
 
 OfferProof exposes meaningful, stateful operations while retaining human control. It can reject an unauthorized agent mutation, generate a verification plan after consent, update one checklist item, preserve progress across reanalysis, lock obsolete steps, and safely undo changes.
 
-All five tools were registered in a local WebMCP-enabled browser test. The core read-and-mutation flow was exercised with `get_case_summary`, `build_verification_plan`, and `update_verification_step`, including rejection before consent and visible success after consent. The application also works as a manual interface without WebMCP.
+The original five-tool core was registered in a local WebMCP-enabled browser test. Its summary, plan, and step-update flow was exercised, including rejection before consent and visible success after consent. The sixth tool and the privacy-safe read, analysis, and mutation receipts are covered by automated contract tests and await final deployed-browser verification. The application also works as a manual interface without WebMCP.
 
 We are especially proud that the product avoids sensational verdicts. Every signal stays connected to observable source text and communicates what the system cannot conclude.
 
