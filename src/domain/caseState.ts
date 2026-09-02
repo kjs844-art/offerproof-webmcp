@@ -61,10 +61,10 @@ export function inspectCase(current: OfferCase): OfferCase {
 
   const maskedText = maskSensitiveText(current.originalText);
   const nextVersion = current.caseVersion + 1;
-  const signals = inspectOfferText(maskedText).map((signal) => (
+  const signals = inspectOfferText(current.originalText).map((signal) => (
     signal.signalId === 'SENSITIVE_DATA_REQUEST'
       ? { ...signal, observedText: '[민감정보 요청이 포함된 문장 가림]' }
-      : signal
+      : { ...signal, observedText: maskSensitiveText(signal.observedText) }
   ));
   const currentSignalIds = new Set(signals.map((signal) => signal.signalId));
 

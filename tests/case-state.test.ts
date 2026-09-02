@@ -73,6 +73,22 @@ test('신호 근거와 도구 상태에는 민감한 원문 값을 노출하지 
   assert.equal(state.maskedText.includes('[비밀값 가림]'), true);
 });
 
+test('값이 없는 비밀번호 입력 요청도 민감정보 신호로 탐지한다', () => {
+  let state = updateOfferText(createOfferCase(), '비밀번호 입력하세요.');
+  state = inspectCase({ ...state, privacyConfirmed: true });
+
+  assert.equal(state.signals.some((signal) => signal.signalId === 'SENSITIVE_DATA_REQUEST'), true);
+  assert.equal(state.signals[0]?.observedText, '[민감정보 요청이 포함된 문장 가림]');
+});
+
+test('값이 없는 계좌번호 제출 요청도 민감정보 신호로 탐지한다', () => {
+  let state = updateOfferText(createOfferCase(), '계좌번호 제출하세요.');
+  state = inspectCase({ ...state, privacyConfirmed: true });
+
+  assert.equal(state.signals.some((signal) => signal.signalId === 'SENSITIVE_DATA_REQUEST'), true);
+  assert.equal(state.signals[0]?.observedText, '[민감정보 요청이 포함된 문장 가림]');
+});
+
 test('새 검토 ID는 서로 다르고 이전 사례의 변경 요청을 거부한다', () => {
   const first = createOfferCase();
   const second = createOfferCase();
