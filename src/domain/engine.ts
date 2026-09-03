@@ -17,6 +17,8 @@ const SIGNAL_DEFINITIONS: SignalDefinition[] = [
     patterns: [
       /(?:교육비|보증금|등록비|장비비|수수료|가입비).{0,24}(?:먼저|선입금|입금|송금|납부)/i,
       /(?:먼저|선입금).{0,24}(?:교육비|보증금|등록비|장비비|수수료|가입비)/i,
+      /(?:training fee|deposit|registration fee|equipment fee|service fee).{0,40}(?:pay|send|transfer|upfront|in advance)/i,
+      /(?:pay|send|transfer).{0,40}(?:training fee|deposit|registration fee|equipment fee|service fee).{0,20}(?:upfront|in advance|before (?:work|starting))/i,
     ],
     observation: '업무 시작 전에 금전 지급을 요구하는 표현이 원문에 있습니다.',
     inference: '금전을 보내기 전에 회사의 공식 채널과 서면 조건을 별도로 확인할 필요가 있습니다.',
@@ -26,7 +28,11 @@ const SIGNAL_DEFINITIONS: SignalDefinition[] = [
   {
     signalId: 'PAYMENT_IN_CRYPTO_OR_GIFT_CARD',
     title: '가상자산·상품권 결제 요청',
-    patterns: [/(?:비트코인|bitcoin|usdt|테더|암호화폐|가상자산|기프트\s*카드|상품권).{0,30}(?:결제|송금|구매|보내)/i],
+    patterns: [
+      /(?:비트코인|bitcoin|usdt|테더|암호화폐|가상자산|기프트\s*카드|상품권).{0,30}(?:결제|송금|구매|보내)/i,
+      /(?:bitcoin|usdt|crypto(?:currency)?|gift\s*card).{0,40}(?:pay|payment|send|transfer|buy|purchase)/i,
+      /(?:pay|send|transfer|buy|purchase).{0,40}(?:bitcoin|usdt|crypto(?:currency)?|gift\s*card)/i,
+    ],
     observation: '가상자산이나 상품권을 이용한 지급 요청이 원문에 있습니다.',
     inference: '지급 방식과 수취 주체를 공식 계약 및 회사 연락처로 다시 확인할 필요가 있습니다.',
     limitations: '일부 합법적인 계약도 가상자산을 사용할 수 있으므로 이 신호만으로 결론낼 수 없습니다.',
@@ -35,7 +41,10 @@ const SIGNAL_DEFINITIONS: SignalDefinition[] = [
   {
     signalId: 'URGENCY_PRESSURE',
     title: '빠른 결정을 압박하는 표현',
-    patterns: [/(?:오늘\s*안에|지금\s*바로|즉시\s*(?:결정|응답|입금)|마감\s*임박|선착순|자리.{0,8}(?:하나|마지막))/i],
+    patterns: [
+      /(?:오늘\s*안에|지금\s*바로|즉시\s*(?:결정|응답|입금)|마감\s*임박|선착순|자리.{0,8}(?:하나|마지막))/i,
+      /(?:decide|respond|reply|pay|act).{0,18}(?:today|now|immediately)|(?:urgent|limited spots?|last spot|offer expires today)/i,
+    ],
     observation: '충분히 확인하기 전에 빠른 결정을 요구하는 표현이 원문에 있습니다.',
     inference: '시간 압박과 별개로 계약 조건과 상대방의 공식 연락처를 확인할 필요가 있습니다.',
     limitations: '실제 채용 일정이 촉박할 수도 있으므로 압박 표현만으로 제안을 판단할 수 없습니다.',
@@ -44,7 +53,10 @@ const SIGNAL_DEFINITIONS: SignalDefinition[] = [
   {
     signalId: 'OFF_PLATFORM_CONTACT',
     title: '비공식 연락 채널로만 유도',
-    patterns: [/(?:카카오톡|카톡|오픈채팅|텔레그램|telegram|왓츠앱|whatsapp|라인\s*메신저|개인\s*DM).{0,24}(?:만|으로|연락|문의)/i],
+    patterns: [
+      /(?:카카오톡|카톡|오픈채팅|텔레그램|telegram|왓츠앱|whatsapp|라인\s*메신저|개인\s*DM).{0,24}(?:만|으로|연락|문의)/i,
+      /(?:contact|message|reach)\s+(?:us|me)?\s*(?:only\s+)?(?:through|via|on)\s+(?:kakaotalk|kakao(?:talk)? open chat|telegram|whatsapp|line|personal dm)/i,
+    ],
     observation: '메신저 또는 개인 채널로 연락하도록 유도하는 표현이 원문에 있습니다.',
     inference: '회사 공식 도메인이나 대표 연락처를 통한 교차 확인이 필요할 수 있습니다.',
     limitations: '일부 조직은 실제로 메신저를 사용하므로 채널만으로 신뢰 여부를 판단할 수 없습니다.',
@@ -53,7 +65,10 @@ const SIGNAL_DEFINITIONS: SignalDefinition[] = [
   {
     signalId: 'SENSITIVE_DATA_REQUEST',
     title: '민감정보 제출 요청',
-    patterns: [/(?:주민등록번호|여권번호|신분증\s*(?:사진|사본)|계좌번호|비밀번호|인증번호|OTP|보안카드).{0,30}(?:보내|제출|전달|입력|회신|필요)/i],
+    patterns: [
+      /(?:주민등록번호|여권번호|신분증\s*(?:사진|사본)|계좌번호|비밀번호|인증번호|OTP|보안카드).{0,30}(?:보내|제출|전달|입력|회신|필요)/i,
+      /(?:social security number|ssn|passport (?:number|copy)|photo of (?:your )?id|bank account|password|verification code|otp).{0,40}(?:send|submit|share|enter|reply|required|need)/i,
+    ],
     observation: '신원·금융·인증 관련 민감정보를 요구하는 표현이 원문에 있습니다.',
     inference: '제출 전에 정보가 필요한 이유, 보관 주체, 공식 제출 경로를 확인해야 합니다.',
     limitations: '정식 채용 후 법적으로 필요한 정보가 있을 수 있으므로 요청 시점과 경로를 함께 확인해야 합니다.',
@@ -71,7 +86,10 @@ const SIGNAL_DEFINITIONS: SignalDefinition[] = [
   {
     signalId: 'MISSING_EMPLOYER_DETAILS',
     title: '고용주 정보를 나중에 공개한다는 표현',
-    patterns: [/(?:회사명|업체명|고용주|담당자\s*소속).{0,20}(?:비공개|추후\s*(?:공개|안내)|나중에\s*(?:공개|안내))/i],
+    patterns: [
+      /(?:회사명|업체명|고용주|담당자\s*소속).{0,20}(?:비공개|추후\s*(?:공개|안내)|나중에\s*(?:공개|안내))/i,
+      /(?:company name|employer|client company|recruiter affiliation).{0,30}(?:shared|revealed|provided)\s+later|(?:company name|employer).{0,20}(?:confidential|undisclosed)/i,
+    ],
     observation: '회사 또는 담당자 정보를 현재 제공하지 않는다는 표현이 원문에 있습니다.',
     inference: '지원이나 정보 제출 전에 고용주와 담당자의 소속을 공식 채널에서 확인할 필요가 있습니다.',
     limitations: '채용 대행사가 고객사를 비공개로 진행하는 정상적인 사례도 있습니다.',
@@ -80,7 +98,10 @@ const SIGNAL_DEFINITIONS: SignalDefinition[] = [
   {
     signalId: 'VAGUE_ROLE_OR_TERMS',
     title: '업무나 조건이 구체적이지 않은 표현',
-    patterns: [/(?:누구나\s*가능|간단한\s*업무|업무\s*내용은\s*추후|상세\s*조건은\s*추후|고수익\s*보장|확실한\s*수익)/i],
+    patterns: [
+      /(?:누구나\s*가능|간단한\s*업무|업무\s*내용은\s*추후|상세\s*조건은\s*추후|고수익\s*보장|확실한\s*수익)/i,
+      /(?:anyone can do|simple (?:remote )?(?:work|job)|job details (?:shared|provided) later|terms (?:shared|provided) later|guaranteed (?:high )?(?:income|earnings|returns))/i,
+    ],
     observation: '직무나 조건을 구체적으로 설명하지 않는 표현이 원문에 있습니다.',
     inference: '지원 전에 직무, 근무시간, 급여 산정 방식과 계약 형태를 서면으로 확인할 필요가 있습니다.',
     limitations: '짧은 홍보 문구일 수 있으므로 전체 공고나 계약서에 세부 조건이 있는지 확인해야 합니다.',
