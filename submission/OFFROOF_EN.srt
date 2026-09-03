@@ -1,0 +1,35 @@
+1
+00:00:00,000 --> 00:00:12,000
+A suspicious job offer may mix normal details with pressure and risky requests. Offroof turns the exact wording into evidence-backed verification steps—without issuing a fraud verdict.
+
+2
+00:00:12,000 --> 00:00:30,000
+Everything runs in this browser tab. Each signal stays tied to a source excerpt and clearly separates what was observed from what the app cannot conclude.
+
+3
+00:00:30,000 --> 00:00:50,000
+The page exposes six semantic WebMCP tools. An agent can understand the current case through structured results instead of scraping buttons or guessing from layout.
+
+4
+00:00:50,000 --> 00:01:10,000
+Reading and changing are different permissions. Without visible consent, a checklist mutation is rejected and recorded as a privacy-safe blocked action.
+
+5
+00:01:10,000 --> 00:01:36,000
+After the person explicitly enables agent changes, the same tool creates a verification plan. Case and version guards prevent a stale request from changing another review.
+
+6
+00:01:36,000 --> 00:01:55,000
+The agent updates one current step, the interface changes immediately, and the person can undo it. Offroof keeps human control visible.
+
+7
+00:01:55,000 --> 00:02:12,000
+A local activity trail shows what the agent read, changed, or was blocked from doing. It never stores the offer, personal data, secrets, or raw tool arguments.
+
+8
+00:02:12,000 --> 00:02:25,000
+Official resources remain user-controlled, and the bilingual interface preserves the same case. No link, message, payment, or report is executed automatically.
+
+9
+00:02:25,000 --> 00:02:35,000
+Offroof: evidence before action, consent before change.
