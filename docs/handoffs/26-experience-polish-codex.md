@@ -61,7 +61,8 @@ The old `demo.html` mock now redirects to the real application so it cannot be m
 
 - The repository contains an MIT `LICENSE` and a GitHub Pages workflow for `main`.
 - On 2026-09-03 the user approved the release; the repository was changed to public and GitHub Pages was enabled for Actions deployment.
-- The judge-accessible deployment remains pending until release PR #29 reaches `main` and the resulting Pages run is verified.
+- Release PR #29 reached `main` as merge commit `edd9c40239099f9681c43d4c84c6d5a801162a9e`; the GitHub Pages workflow succeeded and the judge-accessible deployment is live at `https://kjs844-art.github.io/offerproof-webmcp/`.
+- On the deployed origin, a native WebMCP client discovered all six tools. The fictional sample produced six masked signals, a pre-consent plan mutation was blocked, post-consent plan creation produced six steps, one step was updated, and the privacy-safe receipt query returned the resulting trail.
 
 ## Explicit non-claims
 
