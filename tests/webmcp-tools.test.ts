@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
   buildVerificationPlan,
@@ -14,14 +15,20 @@ import {
   type ActionReceipt,
 } from '../src/domain/actionReceipts.ts';
 import type { OfferCase, SignalId, VerificationStatus } from '../src/domain/types.ts';
-import { createOfferProofTools, type OfferProofToolApi } from '../src/webmcp/useOfferProofTools.ts';
+import {
+  createOfferProofTools,
+  OFFERPROOF_TOOL_COUNT,
+  OFFERPROOF_TOOL_NAMES,
+  type OfferProofToolApi,
+} from '../src/webmcp/useOfferProofTools.ts';
 
-function createHarness() {
+function createHarness(overrides: { inspect?: () => OfferCase; showCase?: () => void } = {}) {
   let state = createOfferCase();
   let receipts: ActionReceipt[] = [];
   const api: OfferProofToolApi = {
     getState: () => state,
     inspect: () => {
+      if (overrides.inspect) return overrides.inspect();
       state = inspectCase(state);
       return state;
     },
@@ -43,6 +50,7 @@ function createHarness() {
     recordReceipt: (receipt) => {
       receipts = prependActionReceipt(receipts, receipt);
     },
+    showCase: overrides.showCase,
   };
 
   const tools = createOfferProofTools(api);
@@ -168,8 +176,88 @@ test('도구 메타데이터는 지원되는 WebMCP 힌트만 사용한다', () 
   assert.equal(harness.tool('get_case_summary').annotations?.untrustedContentHint, true);
   assert.equal(harness.tool('inspect_offer_signals').annotations?.untrustedContentHint, true);
   assert.equal(harness.tool('get_case_summary').annotations?.readOnlyHint, false);
+  assert.equal(harness.tool('inspect_offer_signals').annotations?.readOnlyHint, false);
   assert.equal(harness.tool('get_official_resources').annotations?.readOnlyHint, false);
+  assert.equal(harness.tool('build_verification_plan').annotations?.readOnlyHint, false);
+  assert.equal(harness.tool('update_verification_step').annotations?.readOnlyHint, false);
+  assert.equal(harness.tool('build_verification_plan').annotations?.untrustedContentHint, true);
+  assert.equal(harness.tool('update_verification_step').annotations?.untrustedContentHint, true);
   assert.equal(harness.tool('get_action_receipts').annotations?.readOnlyHint, true);
+});
+
+test('공개 도구 목록, 제목, 엄격한 입력 스키마가 화면 계약과 일치한다', () => {
+  const harness = createHarness();
+
+  assert.equal(OFFERPROOF_TOOL_COUNT, 6);
+  assert.deepEqual(harness.tools.map((tool) => tool.name), [...OFFERPROOF_TOOL_NAMES]);
+  assert.equal(new Set(harness.tools.map((tool) => tool.name)).size, OFFERPROOF_TOOL_COUNT);
+  for (const tool of harness.tools) {
+    assert.equal(typeof tool.title, 'string');
+    assert.ok((tool.title ?? '').length > 0);
+    assert.equal(tool.inputSchema.additionalProperties, false);
+  }
+});
+
+test('WebMCP 실패는 원문 없이 안정적인 오류 코드를 반환한다', async () => {
+  const harness = createHarness();
+  harness.setState(updateOfferText(harness.getState(), '교육비를 먼저 입금하세요. secret@example.com'));
+
+  const result = await harness.tool('inspect_offer_signals').execute({});
+  const serialized = JSON.stringify(result);
+  const error = (result.structuredContent as { error: { code: string } }).error;
+
+  assert.equal(result.isError, true);
+  assert.equal(error.code, 'CONFIRMATION_REQUIRED');
+  assert.equal(serialized.includes('secret@example.com'), false);
+});
+
+test('알 수 없는 내부 오류 메시지는 도구 결과에 노출하지 않는다', async () => {
+  const harness = createHarness({
+    inspect: () => { throw new Error('internal secret value: hunter2'); },
+  });
+  let state = updateOfferText(harness.getState(), '교육비를 먼저 입금하세요.');
+  state = { ...state, privacyConfirmed: true, caseVersion: state.caseVersion + 1 };
+  harness.setState(state);
+
+  const result = await harness.tool('inspect_offer_signals').execute({});
+  const serialized = JSON.stringify(result);
+
+  assert.equal(result.isError, true);
+  assert.equal(serialized.includes('hunter2'), false);
+  assert.equal(serialized.includes('TOOL_EXECUTION_FAILED'), true);
+});
+
+test('성공 결과는 화면 변화 위치와 다음 작업을 구조화해 반환한다', async () => {
+  const harness = createHarness();
+  let state = updateOfferText(harness.getState(), '교육비를 먼저 입금하세요.');
+  state = { ...state, privacyConfirmed: true, caseVersion: state.caseVersion + 1 };
+  harness.setState(state);
+
+  const inspected = await harness.tool('inspect_offer_signals').execute({});
+  const structured = inspected.structuredContent as {
+    uiEffect: { kind: string; visibleAt: string };
+    nextActions: string[];
+    requiredHumanAction: string | null;
+  };
+
+  assert.equal(structured.uiEffect.kind, 'signals-replaced');
+  assert.equal(structured.uiEffect.visibleAt, '#result-heading');
+  assert.equal(structured.nextActions.includes('get_official_resources'), true);
+  assert.equal(structured.nextActions.includes('build_verification_plan'), false);
+  assert.equal(structured.requiredHumanAction, 'enable_agent_changes_in_ui');
+});
+
+test('WebMCP 성공 호출은 사용자가 결과를 볼 수 있도록 사례 화면을 요청한다', async () => {
+  let showCaseCount = 0;
+  const harness = createHarness({ showCase: () => { showCaseCount += 1; } });
+  let state = updateOfferText(harness.getState(), '교육비를 먼저 입금하세요.');
+  state = { ...state, privacyConfirmed: true, caseVersion: state.caseVersion + 1 };
+  harness.setState(state);
+
+  await harness.tool('inspect_offer_signals').execute({});
+  await harness.tool('get_official_resources').execute({});
+
+  assert.equal(showCaseCount, 2);
 });
 
 test('작업 영수증은 최신순으로 최대 개수만 보존한다', () => {
@@ -301,18 +389,103 @@ test('작업 영수증에는 원문, 인수, 근거, 비밀값 또는 개인정�
   }
 });
 
-test('영수증 조회 도구는 읽기 전용이며 조회 자체를 새 영수증으로 기록하지 않는다', async () => {
-  const harness = createHarness();
+test('영수증 조회 도구는 읽기 전용이며 조회 자체를 기록하거나 화면 전환하지 않는다', async () => {
+  let showCaseCount = 0;
+  const harness = createHarness({ showCase: () => { showCaseCount += 1; } });
   await harness.tool('inspect_offer_signals').execute({});
   const before = harness.getReceipts();
 
   const tool = harness.tool('get_action_receipts');
   const result = await tool.execute({});
-  const returned = (result.structuredContent as { receipts: ActionReceipt[] }).receipts;
+  const returned = (result.structuredContent as {
+    receipts: Array<{ toolName: string; outcome: string }>;
+  }).receipts;
 
   assert.equal(tool.annotations?.readOnlyHint, true);
-  assert.deepEqual(returned, before);
-  if (returned[0]) returned[0].message = '외부에서 바꾼 값';
+  assert.equal(returned.length, before.length);
+  assert.equal(returned[0]?.toolName, before[0]?.toolName);
+  if (returned[0]) returned[0].toolName = '외부에서 바꾼 값';
   assert.deepEqual(harness.getReceipts(), before);
-  assert.equal(harness.getReceipts()[0]?.message.includes('외부에서 바꾼 값'), false);
+  assert.equal(harness.getReceipts()[0]?.toolName.includes('외부에서 바꾼 값'), false);
+  assert.equal(showCaseCount, 0);
+});
+
+test('숨긴 파일 입력은 접근성 트리와 탭 순서에서 제외하고 표시 버튼으로 동작한다', () => {
+  const appSource = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
+  const fileInput = appSource.match(/<input\s+ref=\{fileInputRef\}[\s\S]*?\/>/)?.[0] ?? '';
+
+  assert.match(fileInput, /tabIndex=\{-1\}/);
+  assert.match(fileInput, /aria-hidden="true"/);
+  assert.doesNotMatch(fileInput, /aria-label=/);
+  assert.match(appSource, /onClick=\{\(\) => fileInputRef\.current\?\.click\(\)\}/);
+});
+
+test('SPA 화면 전환은 새 제목에 포커스하고 감소된 모션에서는 즉시 스크롤한다', () => {
+  const appSource = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
+
+  assert.match(appSource, /querySelector<HTMLElement>\('h1'\)\?\.focus\(\{ preventScroll: true \}\)/);
+  assert.equal([...appSource.matchAll(/<h1[^>]*tabIndex=\{-1\}/g)].length, 3);
+  assert.match(appSource, /matchMedia\('\(prefers-reduced-motion: reduce\)'\)\.matches/);
+  assert.match(appSource, /behavior: prefersReducedMotion \? 'auto' : 'smooth'/);
+});
+
+test('영수증 조회는 개수와 결과·작업 분류 필터를 검증한다', async () => {
+  const harness = createHarness();
+  await harness.tool('inspect_offer_signals').execute({});
+  let state = updateOfferText(harness.getState(), '교육비를 먼저 입금하세요.');
+  state = { ...state, privacyConfirmed: true, caseVersion: state.caseVersion + 1 };
+  harness.setState(state);
+  await harness.tool('inspect_offer_signals').execute({});
+  await harness.tool('get_case_summary').execute({});
+
+  const filtered = await harness.tool('get_action_receipts').execute({
+    limit: 1,
+    outcome: 'success',
+    toolClass: 'analysis',
+  });
+  const structured = filtered.structuredContent as {
+    returnedReceiptCount: number;
+    receipts: Array<{ outcome: string; toolClass: string }>;
+  };
+
+  assert.equal(structured.returnedReceiptCount, 1);
+  assert.deepEqual(structured.receipts.map((receipt) => [receipt.outcome, receipt.toolClass]), [['success', 'analysis']]);
+
+  const invalid = await harness.tool('get_action_receipts').execute({ limit: 11 });
+  assert.equal(invalid.isError, true);
+  assert.equal((invalid.structuredContent as { error: { code: string } }).error.code, 'INVALID_INPUT');
+});
+
+test('대표 최대 신호 흐름의 각 WebMCP 결과는 1500자 예산 안에 머문다', async () => {
+  const harness = createHarness();
+  let state = updateOfferText(harness.getState(), [
+    '교육비를 먼저 입금하고 비트코인으로 송금하세요.',
+    '오늘 안에 바로 결정하고 카카오톡 오픈채팅으로만 연락하세요.',
+    '비밀번호 hunter2를 제출하고 https://bit.ly/example-offer 를 확인하세요.',
+    '회사명은 추후 안내하며 누구나 가능한 간단한 업무입니다.',
+  ].join('\n'));
+  state = {
+    ...state,
+    privacyConfirmed: true,
+    agentChangesAllowed: true,
+    caseVersion: state.caseVersion + 1,
+  };
+  harness.setState(state);
+
+  const inspected = await harness.tool('inspect_offer_signals').execute({});
+  const current = harness.getState();
+  const summary = await harness.tool('get_case_summary').execute({});
+  const plan = await harness.tool('build_verification_plan').execute({
+    caseId: current.caseId,
+    expectedVersion: current.caseVersion,
+  });
+  for (let index = 0; index < 8; index += 1) {
+    await harness.tool('get_official_resources').execute({});
+  }
+  const receipts = await harness.tool('get_action_receipts').execute({ limit: 10 });
+
+  for (const result of [inspected, summary, plan, receipts]) {
+    const toolName = (result.structuredContent as { tool?: string })?.tool ?? 'unknown';
+    assert.ok(JSON.stringify(result).length <= 1500, `${toolName} 결과가 1500자를 초과했습니다: ${JSON.stringify(result).length}`);
+  }
 });

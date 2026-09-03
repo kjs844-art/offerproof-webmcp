@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import {
   buildVerificationPlan,
   createOfferCase,
@@ -14,12 +14,32 @@ import {
   type ActionReceipt,
 } from './domain/actionReceipts';
 import type { OfferCase, OfficialResource, SignalId, VerificationStatus } from './domain/types';
-import { useOfferProofTools, type OfferProofToolApi } from './webmcp/useOfferProofTools';
-
-const SAMPLE_OFFER = `회사명은 추후 안내합니다.
-누구나 가능한 간단한 재택 업무이며 오늘 안에 바로 결정해 주세요.
-업무 시작 전 교육비 5만원을 먼저 입금해야 합니다.
-연락은 카카오톡 오픈채팅으로만 받습니다: https://bit.ly/example-offer`;
+import {
+  LOCALE_TAG,
+  RESOURCE_COPY_EN,
+  SAMPLE_OFFERS,
+  UI_COPY,
+  localizeReceiptMessage,
+  localizeSignal,
+  localizeVerificationLabel,
+  noticeText,
+  sourceFileErrorText,
+  type Locale,
+  type NoticeKey,
+} from './i18n';
+import {
+  readSourceFile,
+  SOURCE_FILE_ACCEPT,
+  SourceFileError,
+  type ImportedSourceMeta,
+  type SourceFileErrorCode,
+} from './sourceIntake';
+import {
+  OFFERPROOF_TOOL_COUNT,
+  OFFERPROOF_TOOL_NAMES,
+  useOfferProofTools,
+  type OfferProofToolApi,
+} from './webmcp/useOfferProofTools';
 
 const OFFICIAL_RESOURCES: OfficialResource[] = [
   {
@@ -42,19 +62,71 @@ const OFFICIAL_RESOURCES: OfficialResource[] = [
   },
 ];
 
-const RECEIPT_TIME_FORMAT = new Intl.DateTimeFormat('ko-KR', {
-  hour: '2-digit',
-  minute: '2-digit',
-  second: '2-digit',
-});
+interface NoticeState {
+  key: NoticeKey;
+  count?: number;
+}
+
+type AppView = 'overview' | 'review' | 'case';
+
+type SourceImportState =
+  | { status: 'idle' }
+  | { status: 'reading' }
+  | { status: 'ready'; meta: ImportedSourceMeta }
+  | { status: 'error'; code: SourceFileErrorCode };
+
+function viewFromLocation(): AppView {
+  const view = new URLSearchParams(window.location.search).get('view');
+  return view === 'review' || view === 'case' ? view : 'overview';
+}
 
 function App() {
+  const [locale, setLocale] = useState<Locale>('ko');
+  const [activeView, setActiveView] = useState<AppView>(() => viewFromLocation());
   const [offerCase, setOfferCase] = useState<OfferCase>(() => createOfferCase());
   const [actionReceipts, setActionReceipts] = useState<ActionReceipt[]>(() => clearActionReceipts());
-  const [notice, setNotice] = useState('제안 원문을 붙여넣고 개인정보를 확인해 주세요.');
+  const [notice, setNotice] = useState<NoticeState>({ key: 'initial' });
+  const [sourceImport, setSourceImport] = useState<SourceImportState>({ status: 'idle' });
+  const [isFileDragActive, setFileDragActive] = useState(false);
   const [previousCase, setPreviousCase] = useState<OfferCase | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
+  const previousViewRef = useRef(activeView);
   const caseRef = useRef(offerCase);
   const receiptsRef = useRef(actionReceipts);
+  const t = UI_COPY[locale];
+  const receiptTimeFormat = useMemo(() => new Intl.DateTimeFormat(LOCALE_TAG[locale], {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }), [locale]);
+
+  useEffect(() => {
+    document.documentElement.lang = locale;
+    document.title = t.documentTitle;
+  }, [locale, t.documentTitle]);
+
+  useEffect(() => {
+    const updateViewFromHistory = () => setActiveView(viewFromLocation());
+    window.addEventListener('popstate', updateViewFromHistory);
+    return () => window.removeEventListener('popstate', updateViewFromHistory);
+  }, []);
+
+  useEffect(() => {
+    if (previousViewRef.current === activeView) return;
+    previousViewRef.current = activeView;
+    mainRef.current?.querySelector<HTMLElement>('h1')?.focus({ preventScroll: true });
+  }, [activeView]);
+
+  const navigateTo = (view: AppView, replace = false) => {
+    const url = new URL(window.location.href);
+    if (view === 'overview') url.searchParams.delete('view');
+    else url.searchParams.set('view', view);
+    window.history[replace ? 'replaceState' : 'pushState']({}, '', url);
+    setActiveView(view);
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    window.scrollTo({ top: 0, behavior: prefersReducedMotion ? 'auto' : 'smooth' });
+  };
 
   const commit = (change: (current: OfferCase) => OfferCase) => {
     const next = change(caseRef.current);
@@ -73,55 +145,101 @@ function App() {
     getState: () => caseRef.current,
     inspect: () => {
       const next = commit(inspectCase);
-      setNotice(`확인이 필요한 신호 ${next.signals.length}개를 찾았습니다.`);
+      setNotice({ key: 'signalsFound', count: next.signals.length });
       return next;
     },
     buildPlan: (caseId: string, expectedVersion: number, signalIds?: SignalId[]) => {
       const before = caseRef.current;
       const next = commit((current) => buildVerificationPlan(current, expectedVersion, caseId, signalIds));
       setPreviousCase(before);
-      setNotice(`확인 체크리스트 ${next.verificationSteps.length}개를 만들었습니다.`);
+      setNotice({ key: 'planBuilt', count: next.verificationSteps.filter((step) => step.isCurrent).length });
       return next;
     },
     updateStep: (caseId: string, stepId: string, status: VerificationStatus, expectedVersion: number) => {
       const before = caseRef.current;
       const next = commit((current) => updateVerificationStep(current, stepId, status, expectedVersion, caseId));
       setPreviousCase(before);
-      setNotice('확인 항목 상태를 변경했습니다.');
+      setNotice({ key: 'stepUpdated' });
       return next;
     },
     getResources: () => OFFICIAL_RESOURCES,
     getReceipts: () => receiptsRef.current,
     recordReceipt,
+    showCase: () => navigateTo('case', true),
   }), []);
 
-  const webMcpStatus = useOfferProofTools(toolApi);
+  const { status: webMcpStatus, reconnect: reconnectWebMcp } = useOfferProofTools(toolApi);
   const currentSteps = offerCase.verificationSteps.filter((step) => step.isCurrent);
   const completedSteps = currentSteps.filter((step) => step.status === 'done').length;
   const hasArchivedSteps = offerCase.verificationSteps.some((step) => !step.isCurrent);
+  const activeStage = !offerCase.originalText.trim()
+    ? 0
+    : offerCase.signals.length === 0
+      ? 1
+      : currentSteps.length === 0 || completedSteps < currentSteps.length
+        ? 2
+        : 3;
+
+  const loadSample = () => {
+    setPreviousCase(null);
+    setSourceImport({ status: 'idle' });
+    commit((current) => updateOfferText(current, SAMPLE_OFFERS[locale]));
+    setNotice({ key: 'sampleLoaded' });
+  };
+
+  const loadSampleAndReview = () => {
+    loadSample();
+    navigateTo('review');
+  };
+
+  const handleSourceFile = async (file: File | undefined) => {
+    if (!file) return;
+    setSourceImport({ status: 'reading' });
+    try {
+      const imported = await readSourceFile(file);
+      setPreviousCase(null);
+      commit((current) => updateOfferText(current, imported.text));
+      setSourceImport({ status: 'ready', meta: imported.meta });
+      setNotice({ key: 'initial' });
+    } catch (error) {
+      setSourceImport({
+        status: 'error',
+        code: error instanceof SourceFileError ? error.code : 'read-failed',
+      });
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleFileDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setFileDragActive(false);
+    void handleSourceFile(event.dataTransfer.files[0]);
+  };
 
   const handleInspect = () => {
     try {
       setPreviousCase(null);
       toolApi.inspect();
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : '검사를 완료하지 못했습니다.');
+      navigateTo('case');
+    } catch {
+      setNotice({ key: 'inspectFailed' });
     }
   };
 
   const handleBuildPlan = () => {
     try {
       toolApi.buildPlan(offerCase.caseId, offerCase.caseVersion);
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : '체크리스트를 만들지 못했습니다.');
+    } catch {
+      setNotice({ key: 'planFailed' });
     }
   };
 
   const handleStepChange = (stepId: string, checked: boolean) => {
     try {
       toolApi.updateStep(offerCase.caseId, stepId, checked ? 'done' : 'todo', offerCase.caseVersion);
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : '상태를 변경하지 못했습니다.');
+    } catch {
+      setNotice({ key: 'updateFailed' });
     }
   };
 
@@ -132,10 +250,10 @@ function App() {
       caseRef.current = restored;
       setOfferCase(restored);
       setPreviousCase(null);
-      setNotice('직전 변경을 새 버전으로 되돌렸습니다.');
-    } catch (error) {
+      setNotice({ key: 'undoDone' });
+    } catch {
       setPreviousCase(null);
-      setNotice(error instanceof Error ? error.message : '되돌리지 못했습니다.');
+      setNotice({ key: 'undoFailed' });
     }
   };
 
@@ -147,126 +265,277 @@ function App() {
     setOfferCase(fresh);
     setActionReceipts(noReceipts);
     setPreviousCase(null);
-    setNotice('새 검토를 시작했습니다.');
+    setSourceImport({ status: 'idle' });
+    setNotice({ key: 'resetDone' });
+    navigateTo('review');
   };
 
   return (
     <div className="app-shell">
       <header className="topbar">
-        <a className="brand" href="#main">OfferProof</a>
+        <button className="brand" type="button" onClick={() => navigateTo('overview')}>
+          <span className="brand-mark" aria-hidden="true">OF</span>
+          <span>Offroof</span>
+        </button>
+        <nav className="page-navigation" aria-label={t.pageNavLabel}>
+          <button type="button" aria-current={activeView === 'overview' ? 'page' : undefined} onClick={() => navigateTo('overview')}>{t.navOverview}</button>
+          <button type="button" aria-current={activeView === 'review' ? 'page' : undefined} onClick={() => navigateTo('review')}>{t.navReview}</button>
+          <button type="button" aria-current={activeView === 'case' ? 'page' : undefined} onClick={() => navigateTo('case')}>
+            {t.navCase}<span>{offerCase.signals.length}</span>
+          </button>
+        </nav>
         <div className="topbar-actions">
-          <span className={`status-pill status-${webMcpStatus}`}>
-            <span aria-hidden="true">●</span>{' '}
-            {webMcpStatus === 'registered' && 'WebMCP 도구 6개 연결됨'}
-            {webMcpStatus === 'checking' && 'WebMCP 확인 중'}
-            {webMcpStatus === 'unsupported' && '수동 모드'}
-            {webMcpStatus === 'error' && 'WebMCP 연결 오류'}
+          <div className="language-switch" role="group" aria-label={t.languageLabel}>
+            <button type="button" aria-pressed={locale === 'ko'} onClick={() => setLocale('ko')}>한</button>
+            <button type="button" aria-pressed={locale === 'en'} onClick={() => setLocale('en')}>EN</button>
+          </div>
+          <span className="local-pill">{t.localMode}</span>
+          <span className={`status-pill status-${webMcpStatus}`} role="status" aria-live="polite">
+            <span className="status-dot" aria-hidden="true" />
+            {webMcpStatus === 'registered' && t.connected(OFFERPROOF_TOOL_COUNT)}
+            {webMcpStatus === 'checking' && t.checking}
+            {webMcpStatus === 'unsupported' && t.manualMode}
+            {webMcpStatus === 'error' && t.connectionError}
           </span>
-          <button className="ghost-button" type="button" onClick={reset}>새 검토</button>
+          <button className="ghost-button" type="button" onClick={reset}>{t.newReview}</button>
         </div>
       </header>
 
-      <main id="main" className="workspace">
+      <main id="main" className="workspace" ref={mainRef}>
+        {activeView === 'overview' && (
+          <>
         <section className="intro" aria-labelledby="page-title">
-          <p className="eyebrow">채용 제안 확인 보드</p>
-          <h1 id="page-title">결론 대신, 확인할 근거를 찾습니다.</h1>
-          <p>붙여넣은 문구를 이 브라우저에서만 고정 규칙으로 살펴봅니다. OfferProof는 사기 또는 안전 여부를 판정하지 않습니다.</p>
+          <div className="intro-copy">
+            <p className="eyebrow">{t.caseFile}</p>
+            <h1 id="page-title" tabIndex={-1}>
+              <span className="title-line title-lead">{t.titleLead}</span>
+              <span className="title-line title-accent">{t.titleAccent}{t.titleTail}</span>
+            </h1>
+            <p>{t.intro}</p>
+          </div>
+          <aside className="trust-console" aria-label={t.handlingNote}>
+            <p className="handling-label">{t.handlingNote}</p>
+            <ul className="trust-line">
+              <li><span>01</span><strong>{t.localProcessing}</strong></li>
+              <li><span>02</span><strong>{t.noExternalAction}</strong></li>
+              <li><span>03</span><strong>{t.noVerdict}</strong></li>
+            </ul>
+          </aside>
         </section>
 
-        {webMcpStatus !== 'registered' && (
+        <ol className="workflow-rail" aria-label={t.workflowLabel}>
+          {t.stages.map((stage, index) => (
+            <li
+              className={index < activeStage ? 'is-complete' : index === activeStage ? 'is-active' : ''}
+              aria-current={index === activeStage ? 'step' : undefined}
+              key={stage}
+            >
+              <span>{index + 1}</span>
+              <strong>{stage}</strong>
+            </li>
+          ))}
+        </ol>
+
+        <section className="overview-actions" aria-label={t.pageNavLabel}>
+          <div className="overview-cta">
+            <button className="primary-button" type="button" onClick={() => navigateTo('review')}>{t.overviewPrimary}</button>
+            <button className="text-button" type="button" onClick={loadSampleAndReview}>{t.overviewDemo}</button>
+          </div>
+          <ol className="overview-card-list">
+            {t.overviewCards.map((item) => (
+              <li key={item.number}>
+                <span>{item.number}</span>
+                <div><strong>{item.title}</strong><p>{item.body}</p></div>
+              </li>
+            ))}
+          </ol>
+        </section>
+          </>
+        )}
+
+        {activeView === 'review' && (
+          <header className="page-heading">
+            <p className="section-kicker">{t.reviewPageKicker}</p>
+            <h1 tabIndex={-1}>{t.reviewPageTitle}</h1>
+            <p>{t.reviewPageBody}</p>
+          </header>
+        )}
+
+        {activeView === 'case' && (
+          <header className="page-heading">
+            <p className="section-kicker">{t.casePageKicker}</p>
+            <h1 tabIndex={-1}>{t.casePageTitle}</h1>
+            <p>{t.casePageBody}</p>
+          </header>
+        )}
+
+        {activeView !== 'overview' && webMcpStatus !== 'registered' && (
           <div className="fallback-banner" role="status">
-            <strong>수동 모드 사용 가능</strong>
-            <span>WebMCP를 찾지 못해도 아래 버튼으로 같은 기능을 사용할 수 있습니다.</span>
+            <div><strong>{t.fallbackTitle}</strong><span>{t.fallbackBody}</span></div>
+            {webMcpStatus !== 'checking' && <button type="button" onClick={reconnectWebMcp}>{t.reconnect}</button>}
           </div>
         )}
 
-        <div className="workspace-grid">
+        {activeView !== 'overview' && (
+        <div className={`workspace-grid workspace-${activeView}`}>
+          {activeView === 'review' && (
+          <>
           <section className="panel input-panel" aria-labelledby="input-heading">
             <div className="panel-heading">
-              <div><p className="step-label">STEP 1</p><h2 id="input-heading">제안 원문 붙여넣기</h2></div>
-              <button className="text-button" type="button" onClick={() => {
-                setPreviousCase(null);
-                commit((current) => updateOfferText(current, SAMPLE_OFFER));
-              }}>
-                안전한 예시 불러오기
-              </button>
+              <div><p className="section-kicker">{t.sourceKicker}</p><h2 id="input-heading">{t.sourceTitle}</h2></div>
+              <button className="sample-button" type="button" onClick={loadSample}>{t.loadSample}</button>
             </div>
+            <p className="case-reference">CASE / {offerCase.caseId.slice(-8).toUpperCase()}</p>
 
-            <label htmlFor="offer-text">받은 이메일이나 메시지의 텍스트</label>
-            <textarea
-              id="offer-text"
-              value={offerCase.originalText}
-              onChange={(event) => {
-                setPreviousCase(null);
-                commit((current) => updateOfferText(current, event.target.value));
-              }}
-              placeholder="실제 개인정보를 지운 뒤 제안 내용을 붙여넣으세요."
-              rows={12}
-            />
-            <div className="field-meta"><span>{offerCase.originalText.length.toLocaleString('ko-KR')}자</span><span>서버 전송 없음 · 현재 탭 메모리</span></div>
-
-            <div className="privacy-card">
-              <strong>개인정보를 먼저 확인하세요</strong>
-              <p>이름, 전화번호, 이메일, 주소, 계좌·식별·인증번호는 지우거나 가린 뒤 진행하세요.</p>
-              <label className="check-row">
+            <form onSubmit={(event) => { event.preventDefault(); handleInspect(); }} noValidate>
+              <div
+                className={`file-drop ${isFileDragActive ? 'is-dragging' : ''}`}
+                onDragEnter={(event) => { event.preventDefault(); setFileDragActive(true); }}
+                onDragOver={(event) => { event.preventDefault(); setFileDragActive(true); }}
+                onDragLeave={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFileDragActive(false);
+                }}
+                onDrop={handleFileDrop}
+              >
                 <input
-                  type="checkbox"
-                  checked={offerCase.privacyConfirmed}
-                  onChange={(event) => {
-                    setPreviousCase(null);
-                    commit((current) => ({
-                      ...current,
-                      privacyConfirmed: event.target.checked,
-                      caseVersion: current.caseVersion + 1,
-                      updatedAt: new Date().toISOString(),
-                    }));
-                  }}
+                  ref={fileInputRef}
+                  className="visually-hidden"
+                  type="file"
+                  accept={SOURCE_FILE_ACCEPT}
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  onChange={(event) => void handleSourceFile(event.currentTarget.files?.[0])}
                 />
-                입력 내용을 확인했고 표시용 마스킹에 동의합니다.
-              </label>
-            </div>
+                <span className="file-drop-mark" aria-hidden="true">↓</span>
+                <div><strong>{t.fileDropTitle}</strong><p>{t.fileDropBody}</p></div>
+                <button type="button" onClick={() => fileInputRef.current?.click()}>{t.chooseFile}</button>
+                <small>{t.supportedFiles}</small>
+              </div>
+              <p className="file-boundary">{t.fileSafetyBoundary}</p>
+              {sourceImport.status === 'reading' && <p className="file-status" role="status">{t.fileReading}</p>}
+              {sourceImport.status === 'ready' && (
+                <div className="file-status is-ready" role="status">
+                  <span>{t.fileLoaded(sourceImport.meta.name)}</span>
+                  <button type="button" onClick={() => setSourceImport({ status: 'idle' })}>{t.clearImportedFile}</button>
+                </div>
+              )}
+              {sourceImport.status === 'error' && <p className="file-status is-error" role="alert">{sourceFileErrorText(locale, sourceImport.code)}</p>}
 
-            <button className="primary-button" type="button" disabled={!offerCase.originalText.trim()} onClick={handleInspect}>
-              확인 신호 살펴보기
-            </button>
+              <div className="input-divider"><span>{t.manualInputDivider}</span></div>
+              <label htmlFor="offer-text">{t.offerLabel}</label>
+              <textarea
+                id="offer-text"
+                className="offer-textarea resize-none"
+                value={offerCase.originalText}
+                onChange={(event) => {
+                  setPreviousCase(null);
+                  setSourceImport({ status: 'idle' });
+                  commit((current) => updateOfferText(current, event.target.value));
+                }}
+                placeholder={t.offerPlaceholder}
+                rows={12}
+              />
+              <div className="field-meta"><span>{t.characters(offerCase.originalText.length)}</span><span>{t.noServerTransfer}</span></div>
+
+              <div className="privacy-card">
+                <div className="privacy-heading"><span aria-hidden="true">!</span><strong>{t.privacyTitle}</strong></div>
+                <p>{t.privacyBody}</p>
+                <label className="check-row">
+                  <input
+                    type="checkbox"
+                    checked={offerCase.privacyConfirmed}
+                    onChange={(event) => {
+                      setPreviousCase(null);
+                      commit((current) => ({
+                        ...current,
+                        privacyConfirmed: event.target.checked,
+                        caseVersion: current.caseVersion + 1,
+                        updatedAt: new Date().toISOString(),
+                      }));
+                    }}
+                  />
+                  {t.privacyConsent}
+                </label>
+              </div>
+
+              <button className="primary-button" type="submit" disabled={!offerCase.originalText.trim()}>
+                {t.inspect}
+              </button>
+            </form>
 
             {offerCase.maskedText && offerCase.maskedText !== offerCase.originalText && (
-              <details className="masked-preview"><summary>마스킹된 표시용 원문 미리보기</summary><pre>{offerCase.maskedText}</pre></details>
+              <details className="masked-preview"><summary>{t.maskedPreview}</summary><pre lang={locale === 'en' ? 'ko' : undefined}>{offerCase.maskedText}</pre></details>
             )}
           </section>
 
+          <aside className="panel intake-notes" aria-label={t.handlingNote}>
+            <p className="section-kicker">{t.handlingNote}</p>
+            <ol>
+              {t.overviewCards.map((item) => (
+                <li key={item.number}><span>{item.number}</span><div><strong>{item.title}</strong><p>{item.body}</p></div></li>
+              ))}
+            </ol>
+            <div className="intake-boundary"><strong>{t.fileSafetyBoundary}</strong><p>{t.noSignalCaveat}</p></div>
+          </aside>
+          </>
+          )}
+
+          {activeView === 'case' && (
           <section className="panel result-panel" aria-labelledby="result-heading">
             <div className="panel-heading result-heading">
-              <div><p className="step-label">STEP 2</p><h2 id="result-heading">확인 보드</h2></div>
-              <span className="version-badge">사례 v{offerCase.caseVersion}</span>
+              <div><p className="section-kicker">{t.evidenceKicker}</p><h2 id="result-heading">{t.evidenceTitle}</h2></div>
+              <span className="version-badge">{t.caseVersion(offerCase.caseVersion)}</span>
             </div>
-            <p className="live-notice" aria-live="polite">{notice}</p>
+            <p className="live-notice" aria-live="polite">{noticeText(locale, notice.key, notice.count)}</p>
 
             {offerCase.signals.length === 0 ? (
-              <div className="empty-state"><span aria-hidden="true">⌁</span><h3>아직 생성된 신호가 없습니다</h3><p>신호가 없더라도 안전하다는 뜻은 아닙니다.</p></div>
+              <div className="empty-state">
+                <div className="empty-mark" aria-hidden="true"><span /><span /><span /></div>
+                <p className="section-kicker">{t.emptyKicker}</p>
+                <h3>{offerCase.originalText.trim() ? t.emptyTitle : t.caseEmptyTitle}</h3>
+                {!offerCase.originalText.trim() && <p className="case-empty-copy">{t.caseEmptyBody}</p>}
+                <ol className="empty-guide">
+                  {t.emptySteps.map((step) => <li key={step}>{step}</li>)}
+                </ol>
+                <button className="empty-cta" type="button" onClick={() => navigateTo('review')}>{t.caseEmptyCta}</button>
+                <p>{t.noSignalCaveat}</p>
+              </div>
             ) : (
               <>
-                <div className="summary-strip">
-                  <div><strong>{offerCase.signals.length}</strong><span>확인 신호</span></div>
-                  <div><strong>{completedSteps}/{currentSteps.length}</strong><span>현재 확인 완료</span></div>
-                  <div><strong>0</strong><span>자동 외부 실행</span></div>
+                <div className="case-status-band">
+                  <div className="case-status-main">
+                    <span>{t.currentReview}</span><strong>{t.signalCount(offerCase.signals.length)}</strong>
+                    <small>{t.notVerdict}</small>
+                  </div>
+                  <div className="completion-meter">
+                    <div><span>{t.planProgress}</span><strong>{completedSteps}/{currentSteps.length}</strong></div>
+                    <progress value={completedSteps} max={Math.max(currentSteps.length, 1)} aria-label={t.progressLabel(completedSteps, currentSteps.length)} />
+                  </div>
+                  <span className="no-action-badge">{t.zeroExternal}</span>
                 </div>
-                <div className="signal-list" aria-label="확인이 필요한 신호">
-                  {offerCase.signals.map((signal) => (
-                    <article className="signal-card" key={signal.signalId}>
-                      <div className="signal-title-row"><span className="observation-badge">관찰 사실</span><code>{signal.signalId}</code></div>
-                      <h3>{signal.title}</h3>
-                      <blockquote>{signal.observedText}</blockquote>
-                      <dl>
-                        <div><dt>관찰</dt><dd>{signal.observation}</dd></div>
-                        <div><dt>제한된 추론</dt><dd>{signal.inference}</dd></div>
-                        <div><dt>한계</dt><dd>{signal.limitations}</dd></div>
-                      </dl>
-                    </article>
-                  ))}
+
+                <div className="signal-list" aria-label={t.signalsLabel}>
+                  {offerCase.signals.map((signal, index) => {
+                    const displaySignal = localizeSignal(signal, locale);
+                    return (
+                      <article className="signal-card" key={signal.signalId}>
+                        <div className="signal-index" aria-hidden="true">{String(index + 1).padStart(2, '0')}</div>
+                        <div className="signal-content">
+                          <div className="signal-title-row"><span className="observation-badge">{t.observedFact}</span><code>{signal.signalId}</code></div>
+                          <h3>{displaySignal.title}</h3>
+                          <blockquote lang={locale === 'en' && /[가-힣]/.test(signal.observedText) ? 'ko' : undefined}>{signal.observedText}</blockquote>
+                          <dl>
+                            <div><dt>{t.observation}</dt><dd>{displaySignal.observation}</dd></div>
+                            <div><dt>{t.boundedInference}</dt><dd>{displaySignal.inference}</dd></div>
+                            <div><dt>{t.limitation}</dt><dd>{displaySignal.limitations}</dd></div>
+                          </dl>
+                        </div>
+                      </article>
+                    );
+                  })}
                 </div>
+
                 <div className="plan-actions">
-                  <button className="secondary-button" type="button" onClick={handleBuildPlan}>확인 체크리스트 만들기</button>
                   <label className="agent-consent">
                     <input
                       type="checkbox"
@@ -281,48 +550,53 @@ function App() {
                         }));
                       }}
                     />
-                    에이전트의 체크리스트 변경 허용
+                    <span><strong>{t.allowAgent}</strong><small>{t.allowAgentBody}</small></span>
                   </label>
+                  <button className="secondary-button" type="button" onClick={handleBuildPlan}>{t.buildPlan}</button>
                 </div>
               </>
             )}
 
             {offerCase.verificationSteps.length > 0 && (
               <section className="checklist" aria-labelledby="checklist-heading">
-                <div className="subheading-row"><div><p className="step-label">STEP 3</p><h3 id="checklist-heading">직접 확인할 체크리스트</h3></div>{previousCase && <button className="text-button" type="button" onClick={handleUndo}>되돌리기</button>}</div>
-                {offerCase.analysisStale && <p className="stale-notice">원문이 바뀌어 이전 체크리스트를 보존했습니다. 신호를 다시 살펴본 뒤 계속하세요.</p>}
-                {!offerCase.analysisStale && hasArchivedSteps && <p className="stale-notice">현재 원문에서 근거가 다시 확인되지 않은 이전 항목은 보관 상태로 잠겼습니다.</p>}
+                <div className="subheading-row">
+                  <div><p className="section-kicker">{t.verifyKicker}</p><h3 id="checklist-heading">{t.verifyTitle}</h3></div>
+                  {previousCase && <button className="text-button" type="button" onClick={handleUndo}>{t.undo}</button>}
+                </div>
+                {offerCase.analysisStale && <p className="stale-notice">{t.staleAnalysis}</p>}
+                {!offerCase.analysisStale && hasArchivedSteps && <p className="stale-notice">{t.archivedAnalysis}</p>}
                 {offerCase.verificationSteps.map((step) => (
                   <label className={`verification-row ${step.status === 'done' ? 'is-done' : ''} ${!step.isCurrent ? 'is-stale' : ''}`} key={step.stepId}>
                     <input type="checkbox" disabled={offerCase.analysisStale || !step.isCurrent} checked={step.status === 'done'} onChange={(event) => handleStepChange(step.stepId, event.target.checked)} />
-                    <span>{step.label}{!step.isCurrent && <small>이전 분석 항목</small>}</span>
+                    <span>{localizeVerificationLabel(step.signalId, step.label, locale)}{!step.isCurrent && <small>{t.archivedItem}</small>}</span>
                   </label>
                 ))}
               </section>
             )}
 
-            <section className="action-receipts" aria-labelledby="receipts-heading">
+            <section id="agent-activity" className="action-receipts" aria-labelledby="receipts-heading">
               <div className="subheading-row">
-                <div>
-                  <p className="step-label">STEP 4</p>
-                  <h3 id="receipts-heading">WebMCP 작업 영수증</h3>
-                </div>
-                <span className="receipt-count">최근 {actionReceipts.length}/{MAX_ACTION_RECEIPTS}</span>
+                <div><p className="section-kicker">{t.activityKicker}</p><h3 id="receipts-heading">{t.activityTitle}</h3></div>
+                <span className="receipt-count">{t.recentReceipts(actionReceipts.length, MAX_ACTION_RECEIPTS)}</span>
               </div>
-              <p>영수증 조회 자체를 제외한 읽기·분석·변경 결과만 남깁니다. 원문, 도구 인수, 근거, 개인정보는 저장하지 않습니다.</p>
+              <p>{t.activityBody}</p>
+              <details className="tool-map">
+                <summary>{t.toolMap(OFFERPROOF_TOOL_COUNT)}</summary>
+                <ul>{OFFERPROOF_TOOL_NAMES.map((name) => <li key={name}><code>{name}</code></li>)}</ul>
+              </details>
               {actionReceipts.length === 0 ? (
-                <p className="receipt-empty">아직 WebMCP 작업 영수증이 없습니다.</p>
+                <p className="receipt-empty">{t.noReceipts}</p>
               ) : (
                 <ol className="receipt-list" aria-live="polite">
                   {actionReceipts.map((receipt) => (
                     <li className={`receipt-row receipt-${receipt.outcome}`} key={receipt.receiptId}>
                       <div className="receipt-title-row">
-                        <strong>{receipt.outcome === 'success' ? '적용됨' : '차단됨'}</strong>
-                        <time dateTime={receipt.createdAt}>{RECEIPT_TIME_FORMAT.format(new Date(receipt.createdAt))}</time>
+                        <strong>{receipt.outcome === 'success' ? t.applied : t.blocked}</strong>
+                        <time dateTime={receipt.createdAt}>{receiptTimeFormat.format(new Date(receipt.createdAt))}</time>
                       </div>
                       <code>{receipt.toolName}</code>
-                      <p>{receipt.message}</p>
-                      <small>{receipt.toolClass === 'read' ? '읽기' : receipt.toolClass === 'analysis' ? '분석' : '변경'} · {receipt.caseId} · v{receipt.caseVersion}</small>
+                      <p>{localizeReceiptMessage(receipt.toolName, receipt.outcome, receipt.message, locale)}</p>
+                      <small>{receipt.toolClass === 'read' ? t.read : receipt.toolClass === 'analysis' ? t.analysis : t.mutation} · {receipt.caseId} · v{receipt.caseVersion}</small>
                     </li>
                   ))}
                 </ol>
@@ -330,18 +604,29 @@ function App() {
             </section>
 
             <section className="resources" aria-labelledby="resources-heading">
-              <p className="step-label">STEP 5</p><h3 id="resources-heading">공식 자료에서 직접 확인</h3>
-              <p>자동 신고나 판정을 하지 않습니다. 적용 범위와 최신 내용을 직접 확인하세요.</p>
+              <div className="subheading-row">
+                <div><p className="section-kicker">{t.resourcesKicker}</p><h3 id="resources-heading">{t.resourcesTitle}</h3></div>
+                <span className="no-action-badge">{t.noAutoReport}</span>
+              </div>
+              <p>{t.resourcesBody}</p>
               <div className="resource-list">
-                {OFFICIAL_RESOURCES.map((resource) => (
-                  <a href={resource.url} target="_blank" rel="noreferrer" key={resource.resourceId}>
-                    <span>{resource.agency}</span><strong>{resource.title} ↗</strong><small>링크 확인일 {resource.lastVerified}</small>
-                  </a>
-                ))}
+                {OFFICIAL_RESOURCES.map((resource) => {
+                  const english = RESOURCE_COPY_EN[resource.resourceId];
+                  return (
+                    <a href={resource.url} target="_blank" rel="noreferrer" key={resource.resourceId}>
+                      <span>{locale === 'en' && english ? english.agency : resource.agency}</span>
+                      <strong>{locale === 'en' && english ? english.title : resource.title} ↗</strong>
+                      {locale === 'en' && english && <small className="resource-original" lang="ko">{resource.agency} · {resource.title}</small>}
+                      <small>{t.linkChecked(resource.lastVerified)}</small>
+                    </a>
+                  );
+                })}
               </div>
             </section>
           </section>
+          )}
         </div>
+        )}
       </main>
     </div>
   );

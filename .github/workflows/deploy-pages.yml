@@ -1,4 +1,4 @@
-name: Deploy OfferProof to GitHub Pages
+name: Deploy Offroof to GitHub Pages
 
 on:
   push:

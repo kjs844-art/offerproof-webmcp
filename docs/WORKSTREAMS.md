@@ -1,4 +1,4 @@
-# OfferProof 협업 작업표
+# Offroof 협업 작업표
 
 ## 보호 규칙
 
