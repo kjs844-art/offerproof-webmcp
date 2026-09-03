@@ -106,8 +106,8 @@ WebMCP, React, TypeScript, Vite, Node.js test runner, GitHub Actions, and GitHub
 
 ## Draft answers for required form fields
 
-- Submitter type: **[USER CONFIRM: Individual or Organization]**
-- Country/region: **[USER CONFIRM]**
+- Submitter type: **Team of Individuals**
+- Country/region: **[USER CONFIRM every team member's country; likely Korea Republic of if both reside in Korea]**
 - Organization: **[Optional; leave blank if submitting as an individual]**
 - App status: **New app**
 - Existing-app changes: **Not applicable**

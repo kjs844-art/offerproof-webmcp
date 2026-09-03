@@ -40,7 +40,9 @@ Nothing has been sent to Devpost.
 
 ## Devpost gates
 
-- [ ] Confirm Submitter Type and country/region.
+- [x] Submitter Type: **Team of Individuals**.
+- [ ] Confirm every team member's country/region.
+- [ ] Confirm the teammate is added to the Devpost project and has accepted the invitation.
 - [ ] Confirm the exact AI-tools wording, learning level, and career-value answers.
 - [ ] Explicitly review and accept the official rules.
 - [ ] Update project 1413157 from `Untitled` to Offroof.
