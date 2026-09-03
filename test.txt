@@ -1,0 +1,2 @@
+// Test file content
+const test = 'hello';
