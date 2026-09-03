@@ -24,11 +24,12 @@
 
 | 도구 | 역할 | 성격 |
 | --- | --- | --- |
-| `get_case_summary` | 현재 사례의 마스킹된 상태 읽기 | 읽기 전용 |
+| `get_case_summary` | 현재 사례의 마스킹된 상태 읽기 | 사례 불변·로컬 영수증 기록 |
 | `inspect_offer_signals` | 현재 입력을 고정 규칙으로 검사하고 근거 카드 생성 | 파생 상태 변경 |
 | `build_verification_plan` | 선택된 신호로 확인 체크리스트 생성 | 되돌릴 수 있는 변경 |
 | `update_verification_step` | 한 단계 상태를 `todo/done`으로 변경 | 좁은 변경 |
-| `get_official_resources` | 관할·주제에 맞는 허용 목록 링크 반환 | 읽기 전용 |
+| `get_official_resources` | 관할·주제에 맞는 허용 목록 링크 반환 | 사례 불변·로컬 영수증 기록 |
+| `get_action_receipts` | 최근 작업 영수증의 복제본 반환 | 읽기 전용·자기 조회 미기록 |
 
 입력은 가능한 한 ID와 enum으로 제한하고 추가 필드를 허용하지 않습니다. 결과에는 사례 버전, 변경된 ID, 변경된 필드를 포함해 UI에서 검증할 수 있어야 합니다.
 
