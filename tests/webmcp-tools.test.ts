@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
   buildVerificationPlan,
@@ -388,8 +389,9 @@ test('작업 영수증에는 원문, 인수, 근거, 비밀값 또는 개인정�
   }
 });
 
-test('영수증 조회 도구는 읽기 전용이며 조회 자체를 새 영수증으로 기록하지 않는다', async () => {
-  const harness = createHarness();
+test('영수증 조회 도구는 읽기 전용이며 조회 자체를 기록하거나 화면 전환하지 않는다', async () => {
+  let showCaseCount = 0;
+  const harness = createHarness({ showCase: () => { showCaseCount += 1; } });
   await harness.tool('inspect_offer_signals').execute({});
   const before = harness.getReceipts();
 
@@ -405,6 +407,26 @@ test('영수증 조회 도구는 읽기 전용이며 조회 자체를 새 영수
   if (returned[0]) returned[0].toolName = '외부에서 바꾼 값';
   assert.deepEqual(harness.getReceipts(), before);
   assert.equal(harness.getReceipts()[0]?.toolName.includes('외부에서 바꾼 값'), false);
+  assert.equal(showCaseCount, 0);
+});
+
+test('숨긴 파일 입력은 접근성 트리와 탭 순서에서 제외하고 표시 버튼으로 동작한다', () => {
+  const appSource = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
+  const fileInput = appSource.match(/<input\s+ref=\{fileInputRef\}[\s\S]*?\/>/)?.[0] ?? '';
+
+  assert.match(fileInput, /tabIndex=\{-1\}/);
+  assert.match(fileInput, /aria-hidden="true"/);
+  assert.doesNotMatch(fileInput, /aria-label=/);
+  assert.match(appSource, /onClick=\{\(\) => fileInputRef\.current\?\.click\(\)\}/);
+});
+
+test('SPA 화면 전환은 새 제목에 포커스하고 감소된 모션에서는 즉시 스크롤한다', () => {
+  const appSource = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
+
+  assert.match(appSource, /querySelector<HTMLElement>\('h1'\)\?\.focus\(\{ preventScroll: true \}\)/);
+  assert.equal([...appSource.matchAll(/<h1[^>]*tabIndex=\{-1\}/g)].length, 3);
+  assert.match(appSource, /matchMedia\('\(prefers-reduced-motion: reduce\)'\)\.matches/);
+  assert.match(appSource, /behavior: prefersReducedMotion \? 'auto' : 'smooth'/);
 });
 
 test('영수증 조회는 개수와 결과·작업 분류 필터를 검증한다', async () => {
