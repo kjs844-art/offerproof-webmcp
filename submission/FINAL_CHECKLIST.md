@@ -21,13 +21,13 @@ Nothing has been sent to Devpost.
 
 ## Release gates
 
-- [ ] Commit and push the final preparation changes.
-- [ ] Merge the release branch through integration into `main`.
+- [x] Commit and push the final preparation changes.
+- [x] Merge the release branch through integration into `main`.
 - [x] Make the GitHub repository public.
 - [x] Enable GitHub Pages for Actions deployment.
-- [ ] Obtain a successful GitHub Pages deployment run.
-- [ ] Verify the public app and repository while signed out.
-- [ ] Re-run native WebMCP discovery and a real tool call on the deployed URL.
+- [x] Obtain a successful GitHub Pages deployment run.
+- [x] Verify the public app and repository without private-repository access.
+- [x] Re-run native WebMCP discovery and real tool calls on the deployed URL.
 - [ ] Capture clean submission screenshots using only fictional data.
 
 ## Video gates
@@ -46,8 +46,9 @@ Nothing has been sent to Devpost.
 - [ ] Confirm the teammate is added to the Devpost project and has accepted the invitation.
 - [ ] Confirm the exact AI-tools wording, learning level, and career-value answers.
 - [ ] Explicitly review and accept the official rules.
-- [ ] Update project 1413157 from `Untitled` to Offroof.
-- [ ] Add the verified live URL, public repository, testing instructions, screenshots, and public YouTube URL.
+- [x] Update project 1413157 from `Untitled` to Offroof.
+- [x] Add the verified live URL, public repository, project description, and technology list.
+- [ ] Add testing-instruction answers, screenshots, and the public YouTube URL.
 - [ ] Preview every field and link.
 - [ ] User explicitly authorizes the final Devpost **Submit** action.
 

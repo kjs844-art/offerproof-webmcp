@@ -113,7 +113,7 @@ WebMCP, React, TypeScript, Vite, Node.js test runner, GitHub Actions, and GitHub
 - Existing-app changes: **Not applicable**
 - Live URL: `https://kjs844-art.github.io/offerproof-webmcp/`
 - Public repository: `https://github.com/kjs844-art/offerproof-webmcp`
-- Agents/clients tested: **Codex in-app browser with native WebMCP discovery and execution; deployed-site retest pending final release**
+- Agents/clients tested: **Codex in-app browser with native WebMCP discovery and execution on the deployed public URL**
 - AI tools leveraged: **[USER CONFIRM exact list; current draft: OpenAI Codex and Claude-family coding agents]**
 - Learning level: **[USER CONFIRM]**
 - Did AI make a career in tech feel more achievable?: **[USER CONFIRM]**
