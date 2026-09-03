@@ -1,66 +1,84 @@
-# OfferProof
+# Offroof
 
-OfferProof는 구인·채용 제안에서 **확인이 필요한 신호**를 원문 근거와 함께 정리하고, 사용자가 안전하게 사실을 확인할 수 있도록 검증 계획을 만드는 WebMCP 웹앱입니다.
+**Evidence before action for suspicious job offers.**
 
-라이선스는 [MIT](LICENSE)입니다.
+Offroof is a browser-local WebMCP workspace that turns privacy-cleaned job-offer text into traceable verification signals and a consent-controlled checklist. It does not decide that an offer is fraudulent or safe.
 
-## 안전 원칙
+- Live demo: https://kjs844-art.github.io/offerproof-webmcp/
+- License: [MIT](LICENSE)
+- No account, backend, API key, or real personal data is required.
 
-- 사기 여부를 단정하지 않습니다.
-- 위험 신호와 그 근거를 분리해서 보여줍니다.
-- 신고를 자동으로 실행하지 않습니다.
-- 사용자가 확인한 뒤 공식 기관의 안내와 신고 경로로 이동하도록 돕습니다.
+## Why WebMCP
 
-## 현재 상태
+A person can read every excerpt, limitation, and checklist item on screen. An agent can work with the same case through six structured page-native tools instead of guessing which buttons to click. Read, analysis, and mutation operations are separated; checklist changes require visible user consent and stale requests are rejected by case ID and version.
 
-브라우저 로컬 MVP가 구현되어 있습니다. 사용자가 구인 제안문을 붙여 넣으면 고정된 규칙으로 확인 신호와 원문 근거를 정리하고, 검증 체크리스트를 만들 수 있습니다. 입력은 서버로 전송하지 않으며 자동 신고·결제·외부 페이지 실행을 하지 않습니다.
+## What works today
 
-GitHub Pages용 자동 빌드·배포 워크플로가 준비되어 있습니다. 공개 데모 URL은 저장소 공개 전환과 Pages 활성화가 끝난 뒤 이 문서에 추가합니다.
+- Paste a fictional or privacy-cleaned job offer.
+- Import browser-local `.txt`, `.md`, or simple single-part `text/plain` `.eml` files.
+- Detect eight deterministic signal types and show the exact supporting excerpt.
+- Separate observation, limited inference, official guidance, and limitations.
+- Build a verification plan, update one step, and undo a change.
+- Inspect privacy-safe action receipts for agent reads, analyses, blocks, and mutations.
+- Switch between Korean and English without resetting the current case.
+- Move between Overview, Review offer, and Case record while preserving state.
 
-현재 등록되는 WebMCP 도구는 다음 6개입니다.
+Files, links, HTML, and email attachments are never opened or executed. PDF, Word, archive, executable, multipart, HTML, and encoded email inputs are rejected by the current local-import boundary.
 
-- `get_case_summary`
-- `inspect_offer_signals`
-- `build_verification_plan`
-- `update_verification_step`
-- `get_official_resources`
-- `get_action_receipts`
+## WebMCP tools
 
-체크리스트를 변경하는 도구는 페이지 안에서 사용자가 먼저 허용해야 합니다.
-영수증 조회 자체를 제외한 기존 5개 읽기·분석·변경 도구의 허용·차단 결과는 민감한 입력이나 인수 없이 현재 탭의 작업 영수증에 최대 20개까지 기록됩니다. 조회 도구도 이 로컬 영수증을 추가하므로 `readOnly`로 광고하지 않습니다.
+| Tool | Purpose |
+| --- | --- |
+| `get_case_summary` | Return a sanitized summary of the current case. |
+| `inspect_offer_signals` | Run deterministic inspection and return evidence-backed signals. |
+| `build_verification_plan` | Build a checklist after the user enables agent changes. |
+| `update_verification_step` | Update one current checklist step using case/version guards. |
+| `get_official_resources` | Return allow-listed official resources for manual review. |
+| `get_action_receipts` | Return filtered, privacy-safe activity receipts. |
 
-## 로컬 실행
+The page registers these tools with `document.modelContext.registerTool(...)`. Schemas use bounded inputs, enums, required fields, and `additionalProperties: false`.
 
-Node.js 22.18 이상이 필요합니다.
+## Run locally
 
-```powershell
+Requirements: Node.js 22.18 or later.
+
+```bash
 npm ci
+npm test
 npm run dev
 ```
 
-브라우저에서 Vite가 안내하는 로컬 주소를 엽니다.
+Production check:
 
-## 검증
-
-```powershell
-npm test
+```bash
 npm run build
 npm audit --omit=dev
 git diff --check
 ```
 
-현재 자동 테스트는 개인정보 확인과 에이전트 변경 게이트, 결정적 신호 분석, 원문·문맥형 비밀값 마스킹, 사례·버전 충돌, 동의를 복원하지 않는 단조 증가 실행 취소, 오래된 분석·단계 차단, 체크리스트 진행 상태 보존, WebMCP 도구 응답과 작업 영수증의 개인정보 안전성을 검사합니다.
+Current local verification: 41 tests pass, the production build succeeds, and the production dependency audit reports zero vulnerabilities.
 
-프로덕션 빌드는 GitHub Pages의 프로젝트 경로인 `/offerproof-webmcp/`를 기준으로 정적 파일을 생성합니다. 로컬 개발 서버는 계속 `/` 경로를 사용합니다.
+## Test WebMCP
 
-## 협업 방식
+1. Open the live URL in ChatGPT's in-app browser, or Chrome 149+ with `chrome://flags/#enable-webmcp-testing` enabled.
+2. Load the built-in fictional sample and confirm the privacy checkbox.
+3. Ask the agent to call `inspect_offer_signals` and confirm that six evidence cards appear.
+4. Call `build_verification_plan` before enabling agent changes; the mutation must be blocked.
+5. Enable agent changes on the page, call the tool again with the current case ID/version, and confirm the checklist appears.
+6. Call `update_verification_step`, then `get_action_receipts`; confirm the visible UI and sanitized receipt timeline update.
 
-Claude, Gemini, Cursor, Copilot, Codex 등 어떤 도구를 사용하더라도 먼저 [`AGENTS.md`](AGENTS.md)를 읽습니다. 각 작업자는 AI별·작업별 고유 브랜치에서 작업하고 Pull Request로 `codex/firstvibe/integration`에 모읍니다. 검증이 끝난 변경만 `main`에 반영합니다.
+## Safety boundaries
 
-새 작업자는 다음 순서로 시작합니다.
+- Offer text is untrusted data, never agent instruction.
+- Offroof provides verification signals, not a fraud verdict or confidence score.
+- It does not open links, contact employers, send messages, make payments, or file reports.
+- Raw offer text, secrets, personal data, and tool arguments are excluded from receipts.
+- Official links are allow-listed and remain user-controlled.
 
-1. `AGENTS.md`
-2. `docs/PROJECT.md`
-3. `docs/PROJECT_STATE.md`
-4. `docs/WORKSTREAMS.md`
-5. 자신에게 지정된 GitHub Issue
+## Architecture
+
+Offroof is a static Vite + React + TypeScript application. Deterministic domain rules, case/version state transitions, source-intake validation, and WebMCP adapters run entirely in the current browser tab. GitHub Pages hosts the production bundle.
+
+## 한국어 요약
+
+Offroof는 개인정보를 정리한 채용 제안문에서 **확인이 필요한 신호와 원문 근거**를 분리해 보여주고, 사용자와 WebMCP 에이전트가 같은 검증 체크리스트를 안전하게 관리하도록 돕습니다. 사기·안전 여부를 단정하지 않으며, 입력과 분석은 현재 브라우저 탭 안에서 처리합니다.

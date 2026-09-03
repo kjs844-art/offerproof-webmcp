@@ -1,8 +1,8 @@
-# OfferProof fictional demo cases
+# Offroof fictional demo cases
 
 These cases are documentation-only fixtures for the current browser-local MVP. They contain no real person, company, account, contact detail, or working suspicious URL. Expected behavior is derived from the current deterministic rules in `src/domain/engine.ts` and the tool contracts in `src/webmcp/useOfferProofTools.ts`.
 
-OfferProof reports **signals that need verification**. A signal is not a fraud verdict, and zero detected signals is not a safety verdict.
+Offroof reports **signals that need verification**. A signal is not a fraud verdict, and zero detected signals is not a safety verdict.
 
 ## Current canonical signal IDs
 

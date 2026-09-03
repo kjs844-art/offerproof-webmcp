@@ -1,50 +1,53 @@
-# OfferProof final submission checklist
+# Offroof final submission checklist
 
-## Build and repository
+### ⏳ Not submitted yet
 
-- [x] Core MVP implemented on the integration branch.
-- [x] Six WebMCP tools implemented; the original five-tool set was registered locally and the sixth is contract-tested.
-- [x] Automated tests pass: 28/28.
-- [x] Production build passes.
-- [x] Production dependency audit reports zero vulnerabilities.
-- [x] GitHub Pages workflow prepared in PR #15.
-- [ ] Merge the reviewed deployment PR into `codex/firstvibe/integration`.
-- [ ] Confirm the full integration diff and merge it into `main`.
-- [ ] Change the GitHub repository to public after owner approval.
-- [ ] Add an owner-approved open-source license.
-- [ ] Confirm the repository contains no secrets or real personal information.
+Nothing has been sent to Devpost.
 
-## Public demo
+## Verified locally
 
-- [ ] Enable GitHub Pages with GitHub Actions as the source.
-- [ ] Verify the public root page returns HTTP 200.
-- [ ] Verify JavaScript and CSS assets return HTTP 200.
-- [ ] Run the complete manual sample flow on the deployed URL.
-- [ ] Verify all six WebMCP tools on the deployed URL.
-- [ ] Verify mutation rejection before consent and success after consent.
-- [ ] Verify read, analysis, blocked mutation, and successful mutation receipts appear without raw inputs.
-- [ ] Verify no dedicated raw-text field or secret value is returned by tools; sanitized evidence sentences are expected after consent.
-- [ ] Test the deployed UI at a narrow mobile width.
+- [x] User-facing brand is Offroof.
+- [x] Overview, Review offer, and Case record preserve one case state.
+- [x] Korean/English switch preserves analysis and checklist state.
+- [x] Paste plus `.txt`, `.md`, and constrained plain-text `.eml` intake work locally.
+- [x] Six real `document.modelContext.registerTool(...)` tools are implemented.
+- [x] Native local discovery and representative calls were verified in a WebMCP client.
+- [x] Mutation consent, case/version guards, undo, and sanitized receipts are implemented.
+- [x] `npm test`: 41/41 tests pass.
+- [x] `npm run build`: passes.
+- [x] `npm audit --omit=dev`: zero production vulnerabilities.
+- [x] MIT license is present and detected by GitHub.
+- [x] Canonical English demo script and `.srt` captions are prepared.
 
-## Video and media
+## Release gates
 
-- [ ] Record the built-in fictional sample only.
-- [ ] Show a WebMCP tool call changing visible page state.
-- [ ] Include spoken English or accurate English subtitles.
-- [ ] Keep the final cut under three minutes.
-- [ ] Upload as a public YouTube video and verify playback while signed out.
-- [ ] Capture a clean landscape hero image.
-- [ ] Capture analysis evidence and consent-gate screenshots.
-- [ ] Capture the WebMCP tool list and visible tool-result screenshot.
-- [ ] Capture the action-receipt timeline showing one blocked and one successful mutation.
+- [ ] Commit and push the final preparation changes.
+- [ ] Merge the release branch through integration into `main`.
+- [ ] Make the GitHub repository public.
+- [ ] Enable GitHub Pages and obtain a successful deployment run.
+- [ ] Verify the public app and repository while signed out.
+- [ ] Re-run native WebMCP discovery and a real tool call on the deployed URL.
+- [ ] Capture clean submission screenshots using only fictional data.
 
-## Devpost
+## Video gates
 
-- [ ] Paste the verified live-demo URL.
-- [ ] Paste the public GitHub repository URL.
-- [ ] Paste the public YouTube URL.
-- [ ] Paste and proofread `submission/DEVPOST.md`.
-- [ ] Add technologies used: WebMCP, React, TypeScript, Vite, GitHub Pages.
-- [ ] Add team/member information.
-- [ ] Preview the submission and test every link.
-- [ ] Submit before the deadline and save the confirmation page.
+- [ ] Record the canonical demo in 1080p landscape.
+- [ ] Keep final runtime under 3 minutes and show the working app in the first 15 seconds.
+- [ ] Show real six-tool discovery, one blocked mutation, consent, one successful mutation, undo, and receipts.
+- [ ] Add clear English narration or `OFFROOF_EN.srt` captions.
+- [ ] Upload publicly to YouTube.
+- [ ] Test video playback while signed out and paste the URL into the canonical draft.
+
+## Devpost gates
+
+- [ ] Confirm Submitter Type and country/region.
+- [ ] Confirm the exact AI-tools wording, learning level, and career-value answers.
+- [ ] Explicitly review and accept the official rules.
+- [ ] Update project 1413157 from `Untitled` to Offroof.
+- [ ] Add the verified live URL, public repository, testing instructions, screenshots, and public YouTube URL.
+- [ ] Preview every field and link.
+- [ ] User explicitly authorizes the final Devpost **Submit** action.
+
+## Freeze after submission
+
+- [ ] Do not edit the repository, live deployment, video, or Devpost entry after the deadline until judging ends.
