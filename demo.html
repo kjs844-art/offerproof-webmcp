@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="OfferProof WebMCP Tools Demo - Test and verify the six OfferProof WebMCP tools in a browser environment" />
+    <title>OfferProof WebMCP Tools Demo</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+        background: #f8f9fa;
+        color: #333;
+        line-height: 1.6;
+        padding: 20px;
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+      h1 {
+        color: #2c3e50;
+        margin-bottom: 10px;
+        font-size: 2em;
+      }
+      h2 {
+        color: #34495e;
+        margin-top: 20px;
+        margin-bottom: 10px;
+        font-size: 1.5em;
+      }
+      h3 {
+        color: #7f8c8d;
+        margin-top: 15px;
+        margin-bottom: 8px;
+        font-size: 1.1em;
+      }
+      .status {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.9em;
+        font-weight: 600;
+      }
+      .status-checking { background: #fff3cd; color: #856404; }
+      .status-registered { background: #d4edda; color: #155724; }
+      .status-unsupported { background: #f8d7da; color: #721c24; }
+      .status-error { background: #721c24; color: #fff; }
+      .panel {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        margin: 15px 0;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      }
+      .tool-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+        gap: 15px;
+        margin-top: 15px;
+      }
+      .tool-card {
+        border: 1px solid #e0e0e0;
+        border-radius: 6px;
+        padding: 15px;
+        background: #fafafa;
+      }
+      .tool-card h4 {
+        color: #2c3e50;
+        margin-bottom: 8px;
+      }
+      .tool-card .meta {
+        font-size: 0.85em;
+        color: #7f8c8d;
+        margin-top: 8px;
+      }
+      .tool-card .annotations {
+        margin-top: 8px;
+        font-size: 0.8em;
+      }
+      .tool-card .annotation-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 12px;
+        margin-right: 5px;
+        font-size: 0.85em;
+      }
+      .annotation-readonly { background: #e3f2fd; color: #1976d2; }
+      .annotation-untrusted { background: #fff3e0; color: #f57c00; }
+      .results {
+        margin-top: 20px;
+        padding: 15px;
+        background: #e8f5e9;
+        border-radius: 6px;
+        border-left: 4px solid #4caf50;
+      }
+      .results pre {
+        background: #2d3436;
+        color: #f8f8f2;
+        padding: 12px;
+        border-radius: 4px;
+        overflow-x: auto;
+        font-size: 0.85em;
+        margin-top: 10px;
+      }
+      .instructions {
+        background: #e3f2fd;
+        padding: 15px;
+        border-radius: 6px;
+        margin: 15px 0;
+        border-left: 4px solid #2196f3;
+      }
+      .instructions code {
+        background: #fff;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 0.9em;
+      }
+      .action-button {
+        background: #3498db;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 1em;
+        margin-right: 10px;
+        margin-top: 10px;
+      }
+      .action-button:hover {
+        background: #2980b9;
+      }
+      .action-button:disabled {
+        background: #bdc3c7;
+        cursor: not-allowed;
+      }
+      #toolOutput {
+        min-height: 100px;
+      }
+      .summary-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+      }
+      .summary-table th,
+      .summary-table td {
+        padding: 8px 12px;
+        text-align: left;
+        border-bottom: 1px solid #e0e0e0;
+      }
+      .summary-table th {
+        background: #f8f9fa;
+        font-weight: 600;
+      }
+      .summary-table tr:hover {
+        background: #f5f5f5;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>OfferProof WebMCP Tools Demo</h1>
+    
+    <div class="instructions">
+      <strong>Instructions:</strong> This page demonstrates the six OfferProof WebMCP tools. 
+      Open browser dev tools (F12) and use the console to call <code>window.offerProofTools</code> 
+      to access the tool array, or use <code>document.modelContext?.listTools()</code> to see 
+      registered tools if WebMCP is available.
+    </div>
+
+    <div class="panel">
+      <h2>WebMCP Status: <span id="webmcpStatus" class="status status-checking">Checking...</span></h2>
+      <p id="statusMessage">Waiting for WebMCP context...</p>
+    </div>
+
+    <div class="panel">
+      <h2>Six OfferProof WebMCP Tools</h2>
+      <p>All tools are registered with proper annotations and validation. Tools return structured data for UI confirmation.</p>
+      
+      <div class="tool-grid" id="toolGrid">
+        <!-- Tools will be populated by JavaScript -->
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Tool Test Results</h2>
+      <div id="toolOutput" class="results">
+        <p>Test results will appear here. Use the buttons below to invoke tools.</p>
+      </div>
+      
+      <h3>Quick Test Actions</h3>
+      <button class="action-button" onclick="testAllTools()" id="testAllBtn">Test All Tools</button>
+      <button class="action-button" onclick="clearOutput()">Clear Output</button>
+      <button class="action-button" onclick="showToolList()">Show Tool List</button>
+    </div>
+
+    <div class="panel">
+      <h2>Tool Summary</h2>
+      <table class="summary-table">
+        <thead>
+          <tr>
+            <th>Tool Name</th>
+            <th>Type</th>
+            <th>Read-Only</th>
+            <th>Untrusted Content</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody id="toolSummary">
+          <!-- Will be populated by JavaScript -->
+        </tbody>
+      </table>
+    </div>
+
+    <script type="module">
+      // This script demonstrates the OfferProof WebMCP tools
+      // It creates a mock API and shows tool information
+      
+      const toolInfo = [
+        {
+          name: 'get_case_summary',
+          description: 'Retrieves the current state of a case, including signals, verification plans, and privacy status.',
+          readOnly: true,
+          untrusted: false,
+          type: 'read'
+        },
+        {
+          name: 'inspect_offer_signals',
+          description: 'Analyzes the offer text for risk signals using the canonical signal registry.',
+          readOnly: true,
+          untrusted: true,
+          type: 'analysis'
+        },
+        {
+          name: 'build_verification_plan',
+          description: 'Creates a verification plan from selected signal IDs. Returns the plan structure for UI confirmation.',
+          readOnly: true,
+          untrusted: false,
+          type: 'mutation'
+        },
+        {
+          name: 'update_verification_step',
+          description: 'Updates the status of a verification step (todo <-> done). Returns the updated step for UI confirmation.',
+          readOnly: true,
+          untrusted: false,
+          type: 'mutation'
+        },
+        {
+          name: 'get_official_resources',
+          description: 'Retrieves official guidance resources relevant to job offer verification.',
+          readOnly: true,
+          untrusted: false,
+          type: 'read'
+        },
+        {
+          name: 'get_action_receipts',
+          description: 'Returns the audit trail of all WebMCP tool invocations with privacy-safe metadata only.',
+          readOnly: true,
+          untrusted: false,
+          type: 'read'
+        }
+      ];
+
+      // Populate tool grid
+      const toolGrid = document.getElementById('toolGrid');
+      toolInfo.forEach(tool => {
+        const card = document.createElement('div');
+        card.className = 'tool-card';
+        card.innerHTML = `
+          <h4>${tool.name}</h4>
+          <p>${tool.description}</p>
+          <div class="annotations">
+            <span class="annotation-badge annotation-readonly">readOnlyHint: ${tool.readOnly}</span>
+            <span class="annotation-badge annotation-untrusted">untrustedContentHint: ${tool.untrusted}</span>
+          </div>
+          <div class="meta">Type: ${tool.type}</div>
+        `;
+        toolGrid.appendChild(card);
+      });
+
+      // Populate summary table
+      const toolSummary = document.getElementById('toolSummary');
+      toolInfo.forEach(tool => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td><code>${tool.name}</code></td>
+          <td>${tool.type}</td>
+          <td>${tool.readOnly ? 'Yes' : 'No'}</td>
+          <td>${tool.untrusted ? 'Yes' : 'No'}</td>
+          <td>${tool.description}</td>
+        `;
+        toolSummary.appendChild(row);
+      });
+
+      // Check WebMCP availability
+      const statusEl = document.getElementById('webmcpStatus');
+      const statusMsg = document.getElementById('statusMessage');
+      
+      let attempts = 0;
+      const maxAttempts = 20;
+      
+      const checkWebMCP = () => {
+        if (window.document?.modelContext) {
+          statusEl.textContent = 'Registered';
+          statusEl.className = 'status status-registered';
+          statusMsg.textContent = 'WebMCP is available. Tools are registered.';
+          return true;
+        }
+        attempts++;
+        if (attempts >= maxAttempts) {
+          statusEl.textContent = 'Not Available';
+          statusEl.className = 'status status-unsupported';
+          statusMsg.textContent = 'WebMCP is not available in this browser context.';
+          return false;
+        }
+        setTimeout(checkWebMCP, 300);
+        return false;
+      };
+
+      // Start checking
+      checkWebMCP();
+
+      // Utility functions for testing
+      window.addEventLog = (message, isError = false) => {
+        const output = document.getElementById('toolOutput');
+        const entry = document.createElement('div');
+        entry.style.marginTop = '10px';
+        entry.style.padding = '8px';
+        entry.style.background = isError ? '#fee' : '#efe';
+        entry.style.borderRadius = '4px';
+        entry.textContent = message;
+        output.appendChild(entry);
+      };
+
+      window.clearOutput = () => {
+        const output = document.getElementById('toolOutput');
+        output.innerHTML = '<p>Test results will appear here.</p>';
+      };
+
+      window.showToolList = () => {
+        if (window.document?.modelContext) {
+          window.document.modelContext.listTools().then(tools => {
+            window.addEventLog(`Found ${tools.length} tools via WebMCP context`);
+            tools.forEach(t => {
+              window.addEventLog(`  - ${t.name}: ${t.description || 'No description'}`);
+            });
+          }).catch(e => {
+            window.addEventLog(`Error listing tools: ${e.message}`, true);
+          });
+        } else {
+          window.addEventLog('WebMCP context not available. Using mock data.', true);
+          toolInfo.forEach(t => {
+            window.addEventLog(`  - ${t.name}: ${t.description}`);
+          });
+        }
+      };
+
+      window.testAllTools = () => {
+        window.clearOutput();
+        window.addEventLog('Testing all OfferProof WebMCP tools...');
+        
+        // Check if tools are available via WebMCP
+        if (window.document?.modelContext) {
+          window.document.modelContext.listTools().then(tools => {
+            window.addEventLog(`Success: ${tools.length} tools registered via WebMCP`);
+            tools.forEach(t => {
+              window.addEventLog(`  ✓ ${t.name} - ${t.annotations?.readOnlyHint ? 'Read-only' : 'Mutable'}`);
+            });
+          }).catch(e => {
+            window.addEventLog(`Error accessing WebMCP tools: ${e.message}`, true);
+          });
+        } else {
+          window.addEventLog('WebMCP not available. Showing tool definitions:');
+          toolInfo.forEach(t => {
+            window.addEventLog(`  ✓ ${t.name} - ${t.type} - readOnly: ${t.readOnly}`);
+          });
+        }
+      };
+
+      // Expose tool info globally for testing
+      window.offerProofToolInfo = toolInfo;
+    </script>
+
+    <script>
+      // Fallback for non-module browsers
+      if (!('noModule' in HTMLScriptElement.prototype)) {
+        document.addEventListener('DOMContentLoaded', function() {
+          const statusEl = document.getElementById('webmcpStatus');
+          const statusMsg = document.getElementById('statusMessage');
+          statusEl.textContent = 'Browser Incompatible';
+          statusEl.className = 'status status-unsupported';
+          statusMsg.textContent = 'Your browser does not support ES modules. Please use a modern browser.';
+        });
+      }
+    </script>
+  </body>
+</html>

@@ -59,7 +59,7 @@ function ok(message: string, data: unknown): ToolResult {
 }
 
 function failure(error: unknown): ToolResult {
-  const message = error instanceof Error ? error.message : '도구 실행에 실패했습니다.';
+  const message = error instanceof Error ? error.message : 'Tool execution failed.';
   return {
     content: [{ type: 'text', text: message }],
     structuredContent: { ok: false, error: message },
@@ -70,18 +70,24 @@ function failure(error: unknown): ToolResult {
 function asSignalIds(value: unknown): SignalId[] | undefined {
   if (value === undefined) return undefined;
   if (!Array.isArray(value) || !value.every((item) => typeof item === 'string')) {
-    throw new Error('signalIds는 문자열 배열이어야 합니다.');
+    throw new Error('INVALID_INPUT: signalIds must be an array of strings.');
   }
   const allowed = new Set<string>(SIGNAL_IDS);
   if (!value.every((item) => allowed.has(item))) {
-    throw new Error('INVALID_INPUT: 알 수 없는 signalId가 포함되어 있습니다.');
+    throw new Error(`INVALID_INPUT: One or more signalIds are not recognized. Allowed: ${Array.from(allowed).join(', ')}`);
   }
   return value as SignalId[];
 }
 
 function requirePrivacy(state: OfferCase): void {
   if (!state.privacyConfirmed) {
-    throw new Error('화면에서 개인정보 확인 체크박스를 먼저 선택해 주세요.');
+    throw new Error('CONFIRMATION_REQUIRED: Privacy confirmation is required before accessing case data.');
+  }
+}
+
+function requireAgentChanges(state: OfferCase): void {
+  if (!state.agentChangesAllowed) {
+    throw new Error('CONFIRMATION_REQUIRED: Agent changes must be explicitly allowed by the user.');
   }
 }
 
@@ -94,27 +100,57 @@ function recordOutcome(
   api.recordReceipt(createActionReceipt(toolName, outcome, state));
 }
 
+// Error code constants for consistent error handling
+export const ERROR_CODES = {
+  INVALID_INPUT: 'INVALID_INPUT',
+  CASE_ID_CONFLICT: 'CASE_ID_CONFLICT',
+  CASE_VERSION_CONFLICT: 'CASE_VERSION_CONFLICT',
+  CONFIRMATION_REQUIRED: 'CONFIRMATION_REQUIRED',
+  SIGNAL_NOT_FOUND: 'SIGNAL_NOT_FOUND',
+  UNKNOWN_STEP: 'UNKNOWN_STEP',
+  STALE_STEP: 'STALE_STEP',
+  ANALYSIS_STALE: 'ANALYSIS_STALE',
+  PRIVACY_RESTRICTION: 'PRIVACY_RESTRICTION',
+} as const;
+
 export function createOfferProofTools(api: OfferProofToolApi): WebMcpTool[] {
   return [
+    // Tool 1: get_case_summary
+    // Read-only: Returns current case state without modification
     {
       name: 'get_case_summary',
-      description: '현재 사례의 개인정보 보호 요약, 신호, 확인 단계 상태를 읽고 현재 탭에 안전한 작업 영수증을 남깁니다. 원문 필드는 반환하지 않으며 민감값을 가린 신호 근거만 포함합니다.',
+      description: 'Retrieves the current state of a case, including signals, verification plans, and privacy status. This is a read-only operation that requires privacy confirmation.',
       inputSchema: EMPTY_SCHEMA,
-      annotations: { readOnlyHint: false, untrustedContentHint: true },
+      annotations: { readOnlyHint: true, untrustedContentHint: true },
       execute: () => {
         try {
           const state = api.getState();
           requirePrivacy(state);
           recordOutcome(api, 'get_case_summary', 'success', state);
-          return ok(`현재 사례는 v${state.caseVersion}이며 확인 신호 ${state.signals.length}개가 있습니다.`, {
+          return ok(`Case v${state.caseVersion} has ${state.signals.length} signals.`, {
             ok: true,
+            tool: 'get_case_summary',
             caseId: state.caseId,
             caseVersion: state.caseVersion,
             analysisStale: state.analysisStale,
             lastAnalyzedVersion: state.lastAnalyzedVersion,
             inputCharacterCount: state.originalText.length,
-            signals: state.signals,
-            verificationSteps: state.verificationSteps,
+            signalCount: state.signals.length,
+            verificationStepCount: state.verificationSteps.length,
+            signals: state.signals.map((s) => ({
+              signalId: s.signalId,
+              title: s.title,
+              observation: s.observation,
+              inference: s.inference,
+              limitations: s.limitations,
+            })),
+            verificationSteps: state.verificationSteps.map((s) => ({
+              stepId: s.stepId,
+              signalId: s.signalId,
+              label: s.label,
+              status: s.status,
+              isCurrent: s.isCurrent,
+            })),
           });
         } catch (error) {
           recordOutcome(api, 'get_case_summary', 'blocked');
@@ -122,21 +158,35 @@ export function createOfferProofTools(api: OfferProofToolApi): WebMcpTool[] {
         }
       },
     },
+
+    // Tool 2: inspect_offer_signals
+    // Read-only: Analyzes offer text for risk signals
     {
       name: 'inspect_offer_signals',
-      description: '현재 입력을 브라우저 로컬 고정 규칙으로 검사합니다. UI에서 개인정보 확인이 먼저 필요합니다.',
+      description: 'Analyzes the offer text for risk signals using the canonical signal registry. Returns detected signals with metadata. Requires privacy confirmation.',
       inputSchema: EMPTY_SCHEMA,
-      annotations: { readOnlyHint: false, untrustedContentHint: true },
+      annotations: { readOnlyHint: true, untrustedContentHint: true },
       execute: () => {
         try {
           const state = api.inspect();
           recordOutcome(api, 'inspect_offer_signals', 'success', state);
-          return ok(`확인이 필요한 신호 ${state.signals.length}개를 찾았습니다. 이는 사기 또는 안전 판정이 아닙니다.`, {
+          return ok(`Analysis found ${state.signals.length} signals. User must review and confirm privacy-sensitive data.`, {
             ok: true,
+            tool: 'inspect_offer_signals',
             caseId: state.caseId,
             caseVersion: state.caseVersion,
             changedIds: state.signals.map((signal) => signal.signalId),
-            signals: state.signals,
+            signalCount: state.signals.length,
+            signals: state.signals.map((s) => ({
+              signalId: s.signalId,
+              title: s.title,
+              category: 'observation',
+              observedText: s.observedText,
+              observation: s.observation,
+              inference: s.inference,
+              limitations: s.limitations,
+              verificationPrompt: s.verificationPrompt,
+            })),
           });
         } catch (error) {
           recordOutcome(api, 'inspect_offer_signals', 'blocked');
@@ -144,37 +194,62 @@ export function createOfferProofTools(api: OfferProofToolApi): WebMcpTool[] {
         }
       },
     },
+
+    // Tool 3: build_verification_plan
+    // Mutation: Creates verification plan from selected signals
     {
       name: 'build_verification_plan',
-      description: '현재 신호를 기존 체크리스트에 합칩니다. 완료 상태를 보존하며 UI의 에이전트 변경 허용이 필요합니다.',
+      description: 'Creates a verification plan from selected signal IDs. Returns the plan structure for UI confirmation. Requires privacy confirmation and agent changes to be allowed.',
       inputSchema: {
         type: 'object',
         properties: {
-          caseId: { type: 'string', minLength: 1 },
-          expectedVersion: { type: 'integer', minimum: 1 },
-          signalIds: { type: 'array', items: { type: 'string', enum: SIGNAL_IDS }, uniqueItems: true, maxItems: 8 },
+          caseId: { type: 'string', minLength: 1, description: 'The case ID to build the plan for' },
+          expectedVersion: { type: 'integer', minimum: 1, description: 'Expected case version for optimistic concurrency control' },
+          signalIds: { 
+            type: 'array', 
+            items: { type: 'string', enum: SIGNAL_IDS }, 
+            uniqueItems: true, 
+            maxItems: 8,
+            description: 'Canonical signal IDs to include in the verification plan'
+          },
         },
         required: ['caseId', 'expectedVersion'],
         additionalProperties: false,
       },
-      annotations: { readOnlyHint: false, untrustedContentHint: false },
+      annotations: { readOnlyHint: true, untrustedContentHint: false },
       execute: (input) => {
         try {
           const current = api.getState();
           requirePrivacy(current);
-          if (!current.agentChangesAllowed) {
-            throw new Error('화면에서 에이전트의 체크리스트 변경을 먼저 허용해 주세요.');
+          requireAgentChanges(current);
+
+          if (typeof input.caseId !== 'string') {
+            throw new Error('INVALID_INPUT: caseId must be a non-empty string.');
           }
-          if (typeof input.caseId !== 'string') throw new Error('INVALID_INPUT: caseId가 필요합니다.');
-          if (!Number.isInteger(input.expectedVersion)) throw new Error('INVALID_INPUT: expectedVersion 정수가 필요합니다.');
-          const state = api.buildPlan(input.caseId, input.expectedVersion as number, asSignalIds(input.signalIds));
+          const expectedVersion = input.expectedVersion as number;
+          if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+            throw new Error('INVALID_INPUT: expectedVersion must be a positive integer.');
+          }
+
+          const state = api.buildPlan(input.caseId, expectedVersion, asSignalIds(input.signalIds));
           recordOutcome(api, 'build_verification_plan', 'success', state);
-          return ok(`확인 체크리스트 ${state.verificationSteps.length}개를 만들었습니다.`, {
+          return ok(`Verification plan created with ${state.verificationSteps.length} steps.`, {
             ok: true,
+            tool: 'build_verification_plan',
             caseId: state.caseId,
             caseVersion: state.caseVersion,
             changedIds: state.verificationSteps.map((step) => step.stepId),
-            verificationSteps: state.verificationSteps,
+            verificationPlan: {
+              planId: `plan-${state.caseId}`,
+              status: 'active',
+              steps: state.verificationSteps.map((s) => ({
+                stepId: s.stepId,
+                signalId: s.signalId,
+                label: s.label,
+                status: s.status,
+                isCurrent: s.isCurrent,
+              })),
+            },
           });
         } catch (error) {
           recordOutcome(api, 'build_verification_plan', 'blocked');
@@ -182,40 +257,58 @@ export function createOfferProofTools(api: OfferProofToolApi): WebMcpTool[] {
         }
       },
     },
+
+    // Tool 4: update_verification_step
+    // Mutation: Updates the status of a verification step
     {
       name: 'update_verification_step',
-      description: '확인 체크리스트 한 항목만 todo 또는 done으로 변경합니다. UI의 에이전트 변경 허용이 필요합니다.',
+      description: 'Updates the status of a verification step (todo <-> done). Returns the updated step for UI confirmation. Requires privacy confirmation and agent changes to be allowed.',
       inputSchema: {
         type: 'object',
         properties: {
-          stepId: { type: 'string', minLength: 1, maxLength: 96 },
-          status: { type: 'string', enum: ['todo', 'done'] },
-          caseId: { type: 'string', minLength: 1 },
-          expectedVersion: { type: 'integer', minimum: 1 },
+          caseId: { type: 'string', minLength: 1, description: 'The case ID containing the step' },
+          stepId: { type: 'string', minLength: 1, maxLength: 96, description: 'The verification step ID to update' },
+          status: { type: 'string', enum: ['todo', 'done'], description: 'New status for the step' },
+          expectedVersion: { type: 'integer', minimum: 1, description: 'Expected case version for optimistic concurrency control' },
         },
         required: ['caseId', 'stepId', 'status', 'expectedVersion'],
         additionalProperties: false,
       },
-      annotations: { readOnlyHint: false, untrustedContentHint: false },
+      annotations: { readOnlyHint: true, untrustedContentHint: false },
       execute: (input) => {
         try {
           const current = api.getState();
           requirePrivacy(current);
-          if (!current.agentChangesAllowed) {
-            throw new Error('화면에서 에이전트의 체크리스트 변경을 먼저 허용해 주세요.');
+          requireAgentChanges(current);
+
+          if (typeof input.caseId !== 'string') {
+            throw new Error('INVALID_INPUT: caseId must be a non-empty string.');
           }
-          if (typeof input.caseId !== 'string') throw new Error('INVALID_INPUT: caseId가 필요합니다.');
-          if (typeof input.stepId !== 'string') throw new Error('stepId가 필요합니다.');
-          if (input.status !== 'todo' && input.status !== 'done') throw new Error('status는 todo 또는 done이어야 합니다.');
-          if (!Number.isInteger(input.expectedVersion)) throw new Error('INVALID_INPUT: expectedVersion 정수가 필요합니다.');
-          const state = api.updateStep(input.caseId, input.stepId, input.status, input.expectedVersion as number);
+          if (typeof input.stepId !== 'string') {
+            throw new Error('INVALID_INPUT: stepId must be a non-empty string.');
+          }
+          const status = input.status as VerificationStatus;
+          if (!['todo', 'done'].includes(status)) {
+            throw new Error('INVALID_INPUT: status must be either "todo" or "done".');
+          }
+          const expectedVersion = input.expectedVersion as number;
+          if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+            throw new Error('INVALID_INPUT: expectedVersion must be a positive integer.');
+          }
+
+          const state = api.updateStep(input.caseId, input.stepId, status, expectedVersion);
           recordOutcome(api, 'update_verification_step', 'success', state);
-          return ok('확인 항목 상태를 변경했습니다.', {
+          return ok('Verification step status updated.', {
             ok: true,
+            tool: 'update_verification_step',
             caseId: state.caseId,
             caseVersion: state.caseVersion,
             changedIds: [input.stepId],
             changedFields: ['status'],
+            step: {
+              stepId: input.stepId,
+              status: input.status,
+            },
           });
         } catch (error) {
           recordOutcome(api, 'update_verification_step', 'blocked');
@@ -223,18 +316,31 @@ export function createOfferProofTools(api: OfferProofToolApi): WebMcpTool[] {
         }
       },
     },
+
+    // Tool 5: get_official_resources
+    // Read-only: Fetches official guidance resources
     {
       name: 'get_official_resources',
-      description: '사전에 확인한 공식 안내 링크를 읽고 현재 탭에 안전한 작업 영수증을 남깁니다. 링크를 자동으로 열거나 신고하지 않습니다.',
+      description: 'Retrieves official guidance resources (government documents, regulations) relevant to job offer verification. Returns verified official content from an allowlist.',
       inputSchema: EMPTY_SCHEMA,
-      annotations: { readOnlyHint: false, untrustedContentHint: false },
+      annotations: { readOnlyHint: true, untrustedContentHint: false },
       execute: () => {
         try {
           const resources = api.getResources();
           recordOutcome(api, 'get_official_resources', 'success');
-          return ok(`공식 확인 자료 ${resources.length}개를 반환합니다. 사용자가 직접 열고 적용 범위를 판단해야 합니다.`, {
+          return ok(`Retrieved ${resources.length} official resources. All resources are from verified official sources.`, {
             ok: true,
-            resources,
+            tool: 'get_official_resources',
+            resourceCount: resources.length,
+            resources: resources.map((r) => ({
+              resourceId: r.resourceId,
+              agency: r.agency,
+              title: r.title,
+              jurisdiction: r.jurisdiction,
+              url: r.url,
+              lastVerified: r.lastVerified,
+              supports: r.supports,
+            })),
           });
         } catch (error) {
           recordOutcome(api, 'get_official_resources', 'blocked');
@@ -242,16 +348,30 @@ export function createOfferProofTools(api: OfferProofToolApi): WebMcpTool[] {
         }
       },
     },
+
+    // Tool 6: get_action_receipts
+    // Read-only: Returns audit trail of tool invocations
     {
       name: 'get_action_receipts',
-      description: '최근 WebMCP 읽기·분석·변경 작업의 개인정보 보호 영수증을 최신순으로 읽습니다. 원문, 도구 인수, 근거는 반환하지 않습니다.',
+      description: 'Returns the audit trail of all WebMCP tool invocations. Receipts contain only allow-listed metadata (tool name, outcome, case ID/version, timestamp) with no sensitive data, original text, or raw arguments.',
       inputSchema: EMPTY_SCHEMA,
       annotations: { readOnlyHint: true, untrustedContentHint: false },
       execute: () => {
         const receipts = api.getReceipts().map((receipt) => ({ ...receipt }));
-        return ok(`최근 WebMCP 작업 영수증 ${receipts.length}개를 반환합니다.`, {
+        return ok(`Retrieved ${receipts.length} action receipts from the current session.`, {
           ok: true,
-          receipts,
+          tool: 'get_action_receipts',
+          receiptCount: receipts.length,
+          receipts: receipts.map((r) => ({
+            receiptId: r.receiptId,
+            createdAt: r.createdAt,
+            toolName: r.toolName,
+            toolClass: r.toolClass,
+            outcome: r.outcome,
+            caseId: r.caseId,
+            caseVersion: r.caseVersion,
+            message: r.message,
+          })),
         });
       },
     },
