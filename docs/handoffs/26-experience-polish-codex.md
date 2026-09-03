@@ -4,7 +4,7 @@
 
 - Working branch: `codex/firstvibe/issue-26-experience-polish`
 - Base commit: `ad90924`
-- No commit, push, pull request, or merge was performed in this worktree.
+- Experience and submission-preparation commits were pushed and merged to `codex/firstvibe/integration` through PRs #28 and #30. Release PR #29 targets `main`.
 
 ## Outcome
 
@@ -46,7 +46,7 @@ The old `demo.html` mock now redirects to the real application so it cannot be m
 
 ## Verification evidence
 
-- `npm test`: 41/41 tests passed.
+- `npm test`: 43/43 tests passed after the final accessibility and read-only contract regressions were added.
 - `npm run build`: passed; Vite production bundle generated.
 - `git diff --check`: no whitespace errors; Windows LF-to-CRLF notices only.
 - `designmd lint DESIGN.md`: 0 errors, 0 warnings.
@@ -60,8 +60,8 @@ The old `demo.html` mock now redirects to the real application so it cannot be m
 ## Deployment readiness snapshot
 
 - The repository contains an MIT `LICENSE` and a GitHub Pages workflow for `main`.
-- As checked on 2026-09-03, the remote repository is still private and its GitHub Pages API returns 404, so there is not yet a judge-accessible live URL.
-- The current work remains uncommitted in this worktree; publishing, enabling Pages, and deployment verification require a separate explicitly approved release step.
+- On 2026-09-03 the user approved the release; the repository was changed to public and GitHub Pages was enabled for Actions deployment.
+- The judge-accessible deployment remains pending until release PR #29 reaches `main` and the resulting Pages run is verified.
 
 ## Explicit non-claims
 

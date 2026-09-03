@@ -33,7 +33,7 @@ WebMCP is central rather than decorative:
 2. Read/analysis operations are separated from state-changing operations.
 3. Checklist mutations require explicit on-page consent.
 4. Case ID and version guards reject stale mutations.
-5. Every call creates a visible, sanitized receipt without retaining offer text or raw arguments.
+5. Operational calls create visible, sanitized receipts without retaining offer text or raw arguments; reading the receipt list does not create a recursive receipt.
 6. The interface still works manually when no WebMCP client is connected.
 
 ## How we built it
@@ -64,7 +64,7 @@ The hard part was not detecting keywords; it was defining a truthful safety boun
 - Exact evidence excerpts with no fraud verdict or confidence theater.
 - Browser-local import with strict rejection of active, binary, multipart, HTML, and encoded content.
 - Korean/English presentation with case state preserved.
-- 41 automated tests, passing production build, and zero production dependency vulnerabilities.
+- 43 automated tests, passing production build, and zero production dependency vulnerabilities.
 - Desktop and mobile audits scoring 100 for Accessibility, Best Practices, SEO, and Agentic Browsing.
 
 ## What we learned

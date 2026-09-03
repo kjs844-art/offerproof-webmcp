@@ -13,7 +13,7 @@ Nothing has been sent to Devpost.
 - [x] Six real `document.modelContext.registerTool(...)` tools are implemented.
 - [x] Native local discovery and representative calls were verified in a WebMCP client.
 - [x] Mutation consent, case/version guards, undo, and sanitized receipts are implemented.
-- [x] `npm test`: 41/41 tests pass.
+- [x] `npm test`: 43/43 tests pass.
 - [x] `npm run build`: passes.
 - [x] `npm audit --omit=dev`: zero production vulnerabilities.
 - [x] MIT license is present and detected by GitHub.
@@ -23,8 +23,9 @@ Nothing has been sent to Devpost.
 
 - [ ] Commit and push the final preparation changes.
 - [ ] Merge the release branch through integration into `main`.
-- [ ] Make the GitHub repository public.
-- [ ] Enable GitHub Pages and obtain a successful deployment run.
+- [x] Make the GitHub repository public.
+- [x] Enable GitHub Pages for Actions deployment.
+- [ ] Obtain a successful GitHub Pages deployment run.
 - [ ] Verify the public app and repository while signed out.
 - [ ] Re-run native WebMCP discovery and a real tool call on the deployed URL.
 - [ ] Capture clean submission screenshots using only fictional data.

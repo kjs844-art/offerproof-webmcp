@@ -90,6 +90,8 @@ function App() {
   const [isFileDragActive, setFileDragActive] = useState(false);
   const [previousCase, setPreviousCase] = useState<OfferCase | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
+  const previousViewRef = useRef(activeView);
   const caseRef = useRef(offerCase);
   const receiptsRef = useRef(actionReceipts);
   const t = UI_COPY[locale];
@@ -110,13 +112,20 @@ function App() {
     return () => window.removeEventListener('popstate', updateViewFromHistory);
   }, []);
 
+  useEffect(() => {
+    if (previousViewRef.current === activeView) return;
+    previousViewRef.current = activeView;
+    mainRef.current?.querySelector<HTMLElement>('h1')?.focus({ preventScroll: true });
+  }, [activeView]);
+
   const navigateTo = (view: AppView, replace = false) => {
     const url = new URL(window.location.href);
     if (view === 'overview') url.searchParams.delete('view');
     else url.searchParams.set('view', view);
     window.history[replace ? 'replaceState' : 'pushState']({}, '', url);
     setActiveView(view);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    window.scrollTo({ top: 0, behavior: prefersReducedMotion ? 'auto' : 'smooth' });
   };
 
   const commit = (change: (current: OfferCase) => OfferCase) => {
@@ -292,13 +301,13 @@ function App() {
         </div>
       </header>
 
-      <main id="main" className="workspace">
+      <main id="main" className="workspace" ref={mainRef}>
         {activeView === 'overview' && (
           <>
         <section className="intro" aria-labelledby="page-title">
           <div className="intro-copy">
             <p className="eyebrow">{t.caseFile}</p>
-            <h1 id="page-title">
+            <h1 id="page-title" tabIndex={-1}>
               <span className="title-line title-lead">{t.titleLead}</span>
               <span className="title-line title-accent">{t.titleAccent}{t.titleTail}</span>
             </h1>
@@ -347,7 +356,7 @@ function App() {
         {activeView === 'review' && (
           <header className="page-heading">
             <p className="section-kicker">{t.reviewPageKicker}</p>
-            <h1>{t.reviewPageTitle}</h1>
+            <h1 tabIndex={-1}>{t.reviewPageTitle}</h1>
             <p>{t.reviewPageBody}</p>
           </header>
         )}
@@ -355,7 +364,7 @@ function App() {
         {activeView === 'case' && (
           <header className="page-heading">
             <p className="section-kicker">{t.casePageKicker}</p>
-            <h1>{t.casePageTitle}</h1>
+            <h1 tabIndex={-1}>{t.casePageTitle}</h1>
             <p>{t.casePageBody}</p>
           </header>
         )}
@@ -393,7 +402,8 @@ function App() {
                   className="visually-hidden"
                   type="file"
                   accept={SOURCE_FILE_ACCEPT}
-                  aria-label={t.chooseFile}
+                  tabIndex={-1}
+                  aria-hidden="true"
                   onChange={(event) => void handleSourceFile(event.currentTarget.files?.[0])}
                 />
                 <span className="file-drop-mark" aria-hidden="true">↓</span>

@@ -438,7 +438,6 @@ export function createOfferProofTools(api: OfferProofToolApi): WebMcpTool[] {
           }
 
           const allReceipts = api.getReceipts();
-          api.showCase?.();
           const receipts = allReceipts
             .filter((receipt) => outcome === undefined || receipt.outcome === outcome)
             .filter((receipt) => toolClass === undefined || receipt.toolClass === toolClass)
