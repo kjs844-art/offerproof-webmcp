@@ -28,7 +28,7 @@ Nothing has been sent to Devpost.
 - [x] Obtain a successful GitHub Pages deployment run.
 - [x] Verify the public app and repository without private-repository access.
 - [x] Re-run native WebMCP discovery and real tool calls on the deployed URL.
-- [ ] Capture clean submission screenshots using only fictional data.
+- [x] Capture clean submission screenshots using only fictional data in `submission/assets/`.
 
 ## Video gates
 
